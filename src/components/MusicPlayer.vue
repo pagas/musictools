@@ -119,6 +119,86 @@
           Clear Loop
         </button>
       </div>
+      <div class="loop-time-inputs">
+        <div class="time-input-group">
+          <label for="loopStartInput">Loop Start (MM:SS):</label>
+          <div class="time-input-wrapper">
+            <input
+              id="loopStartInput"
+              type="text"
+              class="time-input"
+              :value="loopStartInput"
+              @input="handleLoopStartInput"
+              @blur="applyLoopStartInput"
+              @keypress.enter="applyLoopStartInput"
+              placeholder="0:00"
+            />
+            <div class="time-input-buttons">
+              <button 
+                type="button" 
+                class="time-btn time-btn-up" 
+                @click="incrementLoopStart"
+                :disabled="loopStart === null || duration === 0"
+                title="Increase by 1 second"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <button 
+                type="button" 
+                class="time-btn time-btn-down" 
+                @click="decrementLoopStart"
+                :disabled="loopStart === null || loopStart <= 0"
+                title="Decrease by 1 second"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="time-input-group">
+          <label for="loopEndInput">Loop End (MM:SS):</label>
+          <div class="time-input-wrapper">
+            <input
+              id="loopEndInput"
+              type="text"
+              class="time-input"
+              :value="loopEndInput"
+              @input="handleLoopEndInput"
+              @blur="applyLoopEndInput"
+              @keypress.enter="applyLoopEndInput"
+              placeholder="0:00"
+            />
+            <div class="time-input-buttons">
+              <button 
+                type="button" 
+                class="time-btn time-btn-up" 
+                @click="incrementLoopEnd"
+                :disabled="loopEnd === null || loopEnd >= duration || (loopStart !== null && loopEnd >= duration - 0.1)"
+                title="Increase by 1 second"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <button 
+                type="button" 
+                class="time-btn time-btn-down" 
+                @click="decrementLoopEnd"
+                :disabled="loopEnd === null || (loopStart !== null && loopEnd <= loopStart + 0.1)"
+                title="Decrease by 1 second"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="loop-toggle">
         <label class="loop-switch">
           <input type="checkbox" v-model="loopEnabled" :disabled="!isLoopValid">
@@ -187,6 +267,10 @@ const loopEnabled = ref(false)
 const draggingMarker = ref(null)
 const progressWrapper = ref(null)
 const lastLoopJump = ref(0)
+const loopStartInput = ref('')
+const loopEndInput = ref('')
+const isEditingStart = ref(false)
+const isEditingEnd = ref(false)
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
@@ -318,10 +402,12 @@ const setLoopStart = () => {
   if (audioPlayer.value && duration.value > 0) {
     const time = audioPlayer.value.currentTime
     loopStart.value = time
+    loopStartInput.value = formatTime(time)
     
     // If loop end exists and is before new start, clear it
     if (loopEnd.value !== null && loopEnd.value <= time) {
       loopEnd.value = null
+      loopEndInput.value = ''
       loopEnabled.value = false
     }
   }
@@ -334,6 +420,7 @@ const setLoopEnd = () => {
     // Loop end must be after loop start
     if (loopStart.value !== null && time > loopStart.value) {
       loopEnd.value = time
+      loopEndInput.value = formatTime(time)
     } else if (loopStart.value === null) {
       // If no start set, set end and warn
       alert('Please set loop start first, or the end will be ignored.')
@@ -349,6 +436,138 @@ const clearLoop = () => {
   loopStart.value = null
   loopEnd.value = null
   loopEnabled.value = false
+  loopStartInput.value = ''
+  loopEndInput.value = ''
+}
+
+// Parse time input (supports MM:SS format or plain seconds)
+const parseTimeInput = (input) => {
+  if (!input || input.trim() === '') return null
+  
+  const trimmed = input.trim()
+  
+  // Check if it's in MM:SS format
+  const timeMatch = trimmed.match(/^(\d+):(\d{2})$/)
+  if (timeMatch) {
+    const minutes = parseInt(timeMatch[1], 10)
+    const seconds = parseInt(timeMatch[2], 10)
+    if (seconds >= 0 && seconds < 60 && minutes >= 0) {
+      return minutes * 60 + seconds
+    }
+  }
+  
+  // Try parsing as plain seconds (number)
+  const asNumber = parseFloat(trimmed)
+  if (!isNaN(asNumber) && asNumber >= 0) {
+    return asNumber
+  }
+  
+  return null
+}
+
+const handleLoopStartInput = (event) => {
+  isEditingStart.value = true
+  loopStartInput.value = event.target.value
+}
+
+const handleLoopEndInput = (event) => {
+  isEditingEnd.value = true
+  loopEndInput.value = event.target.value
+}
+
+const applyLoopStartInput = () => {
+  isEditingStart.value = false
+  if (!duration.value) return
+  
+  const time = parseTimeInput(loopStartInput.value)
+  
+  if (time === null) {
+    // Invalid input, revert to current loop start
+    if (loopStart.value !== null) {
+      loopStartInput.value = formatTime(loopStart.value)
+    } else {
+      loopStartInput.value = ''
+    }
+    return
+  }
+  
+  // Ensure time is within bounds
+  const validTime = Math.max(0, Math.min(time, duration.value))
+  
+  // If loop end exists and is before new start, clear it
+  if (loopEnd.value !== null && loopEnd.value <= validTime) {
+    alert('Loop start must be before loop end.')
+    loopStartInput.value = loopStart.value !== null ? formatTime(loopStart.value) : ''
+    return
+  }
+  
+  loopStart.value = validTime
+  loopStartInput.value = formatTime(validTime)
+}
+
+const applyLoopEndInput = () => {
+  isEditingEnd.value = false
+  if (!duration.value) return
+  
+  const time = parseTimeInput(loopEndInput.value)
+  
+  if (time === null) {
+    // Invalid input, revert to current loop end
+    if (loopEnd.value !== null) {
+      loopEndInput.value = formatTime(loopEnd.value)
+    } else {
+      loopEndInput.value = ''
+    }
+    return
+  }
+  
+  // Ensure time is within bounds
+  const validTime = Math.max(0, Math.min(time, duration.value))
+  
+  // Loop end must be after loop start
+  if (loopStart.value !== null && validTime <= loopStart.value) {
+    alert('Loop end must be after loop start.')
+    loopEndInput.value = loopEnd.value !== null ? formatTime(loopEnd.value) : ''
+    return
+  }
+  
+  loopEnd.value = validTime
+  loopEndInput.value = formatTime(validTime)
+}
+
+const incrementLoopStart = () => {
+  if (loopStart.value === null || !duration.value) return
+  
+  const newTime = Math.min(loopStart.value + 1, loopEnd.value !== null ? loopEnd.value - 0.1 : duration.value)
+  loopStart.value = Math.max(0, newTime)
+  loopStartInput.value = formatTime(loopStart.value)
+}
+
+const decrementLoopStart = () => {
+  if (loopStart.value === null || loopStart.value <= 0) return
+  
+  loopStart.value = Math.max(0, loopStart.value - 1)
+  loopStartInput.value = formatTime(loopStart.value)
+}
+
+const incrementLoopEnd = () => {
+  if (loopEnd.value === null || !duration.value) return
+  
+  const maxTime = Math.min(duration.value, duration.value)
+  if (loopEnd.value >= maxTime - 0.1) return
+  
+  loopEnd.value = Math.min(loopEnd.value + 1, maxTime)
+  loopEndInput.value = formatTime(loopEnd.value)
+}
+
+const decrementLoopEnd = () => {
+  if (loopEnd.value === null) return
+  
+  const minTime = loopStart.value !== null ? loopStart.value + 0.1 : 0
+  if (loopEnd.value <= minTime) return
+  
+  loopEnd.value = Math.max(minTime, loopEnd.value - 1)
+  loopEndInput.value = formatTime(loopEnd.value)
 }
 
 const isLoopValid = computed(() => {
@@ -403,9 +622,11 @@ const updateMarkerPosition = (clientX) => {
   if (draggingMarker.value === 'start') {
     const newStart = Math.max(0, Math.min(time, loopEnd.value !== null ? loopEnd.value - 0.1 : duration.value))
     loopStart.value = newStart
+    // Input will be updated by watcher
   } else if (draggingMarker.value === 'end') {
     const newEnd = Math.max(loopStart.value !== null ? loopStart.value + 0.1 : 0, Math.min(time, duration.value))
     loopEnd.value = newEnd
+    // Input will be updated by watcher
   }
 }
 
@@ -446,6 +667,28 @@ const handleMarkerTouchStart = (event) => {
   }
 }
 
+// Update input values when loop points change (from dragging or other methods)
+// But only if user is not actively editing the input
+watch([loopStart, duration], () => {
+  if (!isEditingStart.value) {
+    if (loopStart.value !== null) {
+      loopStartInput.value = formatTime(loopStart.value)
+    } else {
+      loopStartInput.value = ''
+    }
+  }
+})
+
+watch([loopEnd, duration], () => {
+  if (!isEditingEnd.value) {
+    if (loopEnd.value !== null) {
+      loopEndInput.value = formatTime(loopEnd.value)
+    } else {
+      loopEndInput.value = ''
+    }
+  }
+})
+
 // Reset player when file changes
 watch(() => props.file, () => {
   isPlaying.value = false
@@ -458,6 +701,10 @@ watch(() => props.file, () => {
   loopEnabled.value = false
   draggingMarker.value = null
   lastLoopJump.value = 0
+  loopStartInput.value = ''
+  loopEndInput.value = ''
+  isEditingStart.value = false
+  isEditingEnd.value = false
   
   // Clean up event listeners
   stopDrag()
@@ -845,6 +1092,109 @@ onMounted(() => {
   margin-bottom: 25px;
 }
 
+.loop-time-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.time-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.time-input-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.time-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.time-input {
+  padding: 10px 40px 10px 15px;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  font-size: 1em;
+  width: 120px;
+  text-align: center;
+  font-weight: 600;
+  color: white;
+  background: #667eea;
+  transition: all 0.3s ease;
+}
+
+.time-input:focus {
+  outline: none;
+  border-color: #764ba2;
+  background: #764ba2;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.time-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: normal;
+}
+
+.time-input-buttons {
+  position: absolute;
+  right: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.time-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.2s ease;
+  border-radius: 3px;
+  width: 24px;
+  height: 14px;
+}
+
+.time-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.time-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.time-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.time-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.time-btn-up {
+  padding-bottom: 1px;
+}
+
+.time-btn-down {
+  padding-top: 1px;
+}
+
 .loop-btn {
   background: white;
   border: 2px solid #667eea;
@@ -968,6 +1318,23 @@ onMounted(() => {
   }
 
   .loop-btn {
+    width: 100%;
+  }
+
+  .loop-time-inputs {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .time-input-group {
+    width: 100%;
+  }
+
+  .time-input-wrapper {
+    width: 100%;
+  }
+
+  .time-input {
     width: 100%;
   }
 }
