@@ -186,6 +186,7 @@ const loopEnd = ref(null)
 const loopEnabled = ref(false)
 const draggingMarker = ref(null)
 const progressWrapper = ref(null)
+const lastLoopJump = ref(0)
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
@@ -211,15 +212,38 @@ const updateProgress = () => {
     
     // Check if we need to loop
     if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
-      if (currentTime.value >= loopEnd.value) {
-        audioPlayer.value.currentTime = loopStart.value
-        // If paused, ensure we stay at loop start
-        if (audioPlayer.value.paused && audioPlayer.value.readyState >= 2) {
-          audioPlayer.value.currentTime = loopStart.value
+      const actualTime = audioPlayer.value.currentTime
+      const now = Date.now()
+      
+      // Prevent rapid-fire loop jumps (minimum 100ms between jumps)
+      // This is especially important when playback is slowed down
+      if (now - lastLoopJump.value < 100) {
+        return
+      }
+      
+      // Check if we've clearly passed the loop end
+      // Use a more lenient threshold for slow playback
+      if (actualTime >= loopEnd.value) {
+        lastLoopJump.value = now
+        // Use requestAnimationFrame for smoother transition
+        requestAnimationFrame(() => {
+          if (audioPlayer.value && loopEnabled.value && loopStart.value !== null) {
+            audioPlayer.value.currentTime = loopStart.value
+          }
+        })
+      } 
+      // Check if we're before loop start (only when playing)
+      // Use a small buffer to prevent issues during slow playback
+      else if (actualTime < loopStart.value && isPlaying.value && !audioPlayer.value.paused) {
+        // Only jump if we're significantly before the start (not just slightly due to rounding)
+        if (actualTime < loopStart.value - 0.1) {
+          lastLoopJump.value = now
+          requestAnimationFrame(() => {
+            if (audioPlayer.value && loopEnabled.value && loopStart.value !== null) {
+              audioPlayer.value.currentTime = loopStart.value
+            }
+          })
         }
-      } else if (currentTime.value < loopStart.value && isPlaying.value) {
-        // If somehow we're before loop start while playing, jump to start
-        audioPlayer.value.currentTime = loopStart.value
       }
     }
   }
@@ -244,8 +268,17 @@ const handleEnded = () => {
   // If loop is enabled and valid, restart from loop start
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
     if (audioPlayer.value) {
-      audioPlayer.value.currentTime = loopStart.value
-      audioPlayer.value.play()
+      // Use requestAnimationFrame to ensure smooth looping
+      requestAnimationFrame(() => {
+        if (audioPlayer.value && loopEnabled.value) {
+          audioPlayer.value.currentTime = loopStart.value
+          if (!audioPlayer.value.paused) {
+            audioPlayer.value.play().catch(() => {
+              // Ignore play promise errors (e.g., user interaction required)
+            })
+          }
+        }
+      })
     }
   } else {
     isPlaying.value = false
@@ -424,6 +457,7 @@ watch(() => props.file, () => {
   loopEnd.value = null
   loopEnabled.value = false
   draggingMarker.value = null
+  lastLoopJump.value = 0
   
   // Clean up event listeners
   stopDrag()
