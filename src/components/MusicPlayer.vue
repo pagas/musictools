@@ -26,14 +26,55 @@
           <span>{{ formatTime(currentTime) }}</span>
           <span>{{ formatTime(duration) }}</span>
         </div>
-        <input
-          type="range"
-          class="progress-bar"
-          :min="0"
-          :max="duration || 100"
-          :value="currentTime"
-          @input="seek"
-        />
+        <div class="progress-wrapper">
+          <input
+            type="range"
+            class="progress-bar"
+            :min="0"
+            :max="duration || 100"
+            :value="currentTime"
+            @input="seek"
+            :style="{ pointerEvents: draggingMarker ? 'none' : 'auto' }"
+          />
+          <div 
+            class="loop-markers" 
+            v-if="loopStart !== null || loopEnd !== null"
+            ref="progressWrapper"
+            @mousedown.prevent="handleMarkerMouseDown"
+            @touchstart.prevent="handleMarkerTouchStart"
+          >
+            <div 
+              v-if="loopStart !== null"
+              class="loop-marker loop-start"
+              :class="{ dragging: draggingMarker === 'start' }"
+              :style="{ left: `${(loopStart / duration) * 100}%` }"
+              :title="`Loop Start: ${formatTime(loopStart)} - Drag to adjust`"
+              @mousedown.stop="startDrag('start', $event)"
+              @touchstart.stop="startDrag('start', $event)"
+            ></div>
+            <div 
+              v-if="loopEnd !== null"
+              class="loop-marker loop-end"
+              :class="{ dragging: draggingMarker === 'end' }"
+              :style="{ left: `${(loopEnd / duration) * 100}%` }"
+              :title="`Loop End: ${formatTime(loopEnd)} - Drag to adjust`"
+              @mousedown.stop="startDrag('end', $event)"
+              @touchstart.stop="startDrag('end', $event)"
+            ></div>
+            <div 
+              v-if="loopStart !== null && loopEnd !== null"
+              class="loop-range"
+              :style="{ 
+                left: `${(loopStart / duration) * 100}%`,
+                width: `${((loopEnd - loopStart) / duration) * 100}%`
+              }"
+            ></div>
+          </div>
+        </div>
+        <div class="loop-info" v-if="loopStart !== null || loopEnd !== null">
+          <span v-if="loopStart !== null">Start: {{ formatTime(loopStart) }}</span>
+          <span v-if="loopEnd !== null">End: {{ formatTime(loopEnd) }}</span>
+        </div>
       </div>
 
       <div class="volume-control">
@@ -50,6 +91,43 @@
           @input="updateVolume"
         />
         <span>{{ volume }}%</span>
+      </div>
+    </div>
+
+    <div class="loop-controls">
+      <h3>Loop Controls</h3>
+      <div class="loop-buttons">
+        <button 
+          class="loop-btn" 
+          :class="{ active: loopStart !== null }"
+          @click="setLoopStart"
+        >
+          Mark Loop Start
+        </button>
+        <button 
+          class="loop-btn" 
+          :class="{ active: loopEnd !== null }"
+          @click="setLoopEnd"
+        >
+          Mark Loop End
+        </button>
+        <button 
+          class="loop-btn loop-clear" 
+          @click="clearLoop"
+          v-if="loopStart !== null || loopEnd !== null"
+        >
+          Clear Loop
+        </button>
+      </div>
+      <div class="loop-toggle">
+        <label class="loop-switch">
+          <input type="checkbox" v-model="loopEnabled" :disabled="!isLoopValid">
+          <span class="slider"></span>
+          <span class="label-text">Enable Loop</span>
+        </label>
+        <span v-if="!isLoopValid && (loopStart !== null || loopEnd !== null)" class="loop-warning">
+          Both start and end must be set to enable loop
+        </span>
       </div>
     </div>
 
@@ -87,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   file: {
@@ -103,6 +181,11 @@ const duration = ref(0)
 const volume = ref(100)
 const currentSpeed = ref(1)
 const customSpeed = ref(1)
+const loopStart = ref(null)
+const loopEnd = ref(null)
+const loopEnabled = ref(false)
+const draggingMarker = ref(null)
+const progressWrapper = ref(null)
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
@@ -125,6 +208,20 @@ const handleLoadedMetadata = () => {
 const updateProgress = () => {
   if (audioPlayer.value) {
     currentTime.value = audioPlayer.value.currentTime
+    
+    // Check if we need to loop
+    if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
+      if (currentTime.value >= loopEnd.value) {
+        audioPlayer.value.currentTime = loopStart.value
+        // If paused, ensure we stay at loop start
+        if (audioPlayer.value.paused && audioPlayer.value.readyState >= 2) {
+          audioPlayer.value.currentTime = loopStart.value
+        }
+      } else if (currentTime.value < loopStart.value && isPlaying.value) {
+        // If somehow we're before loop start while playing, jump to start
+        audioPlayer.value.currentTime = loopStart.value
+      }
+    }
   }
 }
 
@@ -144,10 +241,18 @@ const updateVolume = (event) => {
 }
 
 const handleEnded = () => {
-  isPlaying.value = false
-  currentTime.value = 0
-  if (audioPlayer.value) {
-    audioPlayer.value.currentTime = 0
+  // If loop is enabled and valid, restart from loop start
+  if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
+    if (audioPlayer.value) {
+      audioPlayer.value.currentTime = loopStart.value
+      audioPlayer.value.play()
+    }
+  } else {
+    isPlaying.value = false
+    currentTime.value = 0
+    if (audioPlayer.value) {
+      audioPlayer.value.currentTime = 0
+    }
   }
 }
 
@@ -176,6 +281,138 @@ const formatTime = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+const setLoopStart = () => {
+  if (audioPlayer.value && duration.value > 0) {
+    const time = audioPlayer.value.currentTime
+    loopStart.value = time
+    
+    // If loop end exists and is before new start, clear it
+    if (loopEnd.value !== null && loopEnd.value <= time) {
+      loopEnd.value = null
+      loopEnabled.value = false
+    }
+  }
+}
+
+const setLoopEnd = () => {
+  if (audioPlayer.value && duration.value > 0) {
+    const time = audioPlayer.value.currentTime
+    
+    // Loop end must be after loop start
+    if (loopStart.value !== null && time > loopStart.value) {
+      loopEnd.value = time
+    } else if (loopStart.value === null) {
+      // If no start set, set end and warn
+      alert('Please set loop start first, or the end will be ignored.')
+      return
+    } else {
+      alert('Loop end must be after loop start.')
+      return
+    }
+  }
+}
+
+const clearLoop = () => {
+  loopStart.value = null
+  loopEnd.value = null
+  loopEnabled.value = false
+}
+
+const isLoopValid = computed(() => {
+  return loopStart.value !== null && loopEnd.value !== null && loopEnd.value > loopStart.value
+})
+
+const getTimeFromPosition = (clientX) => {
+  if (!progressWrapper.value || !duration.value) return null
+  
+  const rect = progressWrapper.value.getBoundingClientRect()
+  const x = clientX - rect.left
+  const percentage = Math.max(0, Math.min(1, x / rect.width))
+  return percentage * duration.value
+}
+
+const startDrag = (marker, event) => {
+  draggingMarker.value = marker
+  const clientX = event.touches ? event.touches[0].clientX : event.clientX
+  updateMarkerPosition(clientX)
+  
+  document.addEventListener('mousemove', handleDrag)
+  document.addEventListener('mouseup', stopDrag)
+  document.addEventListener('touchmove', handleDrag)
+  document.addEventListener('touchend', stopDrag)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'grabbing'
+}
+
+const handleDrag = (event) => {
+  if (!draggingMarker.value) return
+  
+  const clientX = event.touches ? event.touches[0].clientX : event.clientX
+  updateMarkerPosition(clientX)
+}
+
+const stopDrag = () => {
+  draggingMarker.value = null
+  document.removeEventListener('mousemove', handleDrag)
+  document.removeEventListener('mouseup', stopDrag)
+  document.removeEventListener('touchmove', handleDrag)
+  document.removeEventListener('touchend', stopDrag)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
+const updateMarkerPosition = (clientX) => {
+  if (!draggingMarker.value || !duration.value) return
+  
+  const time = getTimeFromPosition(clientX)
+  if (time === null) return
+  
+  if (draggingMarker.value === 'start') {
+    const newStart = Math.max(0, Math.min(time, loopEnd.value !== null ? loopEnd.value - 0.1 : duration.value))
+    loopStart.value = newStart
+  } else if (draggingMarker.value === 'end') {
+    const newEnd = Math.max(loopStart.value !== null ? loopStart.value + 0.1 : 0, Math.min(time, duration.value))
+    loopEnd.value = newEnd
+  }
+}
+
+const handleMarkerMouseDown = (event) => {
+  // Allow clicking on the progress bar to set markers when not dragging
+  if (!draggingMarker.value && event.target === progressWrapper.value) {
+    const time = getTimeFromPosition(event.clientX)
+    if (time !== null) {
+      // Set marker based on which one is closer
+      if (loopStart.value !== null && loopEnd.value !== null) {
+        const distToStart = Math.abs(time - loopStart.value)
+        const distToEnd = Math.abs(time - loopEnd.value)
+        if (distToStart < distToEnd && time < loopEnd.value) {
+          loopStart.value = Math.max(0, Math.min(time, loopEnd.value - 0.1))
+        } else if (time > loopStart.value) {
+          loopEnd.value = Math.max(loopStart.value + 0.1, Math.min(time, duration.value))
+        }
+      }
+    }
+  }
+}
+
+const handleMarkerTouchStart = (event) => {
+  // Similar to mouse down but for touch
+  if (!draggingMarker.value && event.target === progressWrapper.value && event.touches.length > 0) {
+    const time = getTimeFromPosition(event.touches[0].clientX)
+    if (time !== null) {
+      if (loopStart.value !== null && loopEnd.value !== null) {
+        const distToStart = Math.abs(time - loopStart.value)
+        const distToEnd = Math.abs(time - loopEnd.value)
+        if (distToStart < distToEnd && time < loopEnd.value) {
+          loopStart.value = Math.max(0, Math.min(time, loopEnd.value - 0.1))
+        } else if (time > loopStart.value) {
+          loopEnd.value = Math.max(loopStart.value + 0.1, Math.min(time, duration.value))
+        }
+      }
+    }
+  }
+}
+
 // Reset player when file changes
 watch(() => props.file, () => {
   isPlaying.value = false
@@ -183,10 +420,29 @@ watch(() => props.file, () => {
   customSpeed.value = 1
   currentTime.value = 0
   volume.value = 100
+  loopStart.value = null
+  loopEnd.value = null
+  loopEnabled.value = false
+  draggingMarker.value = null
+  
+  // Clean up event listeners
+  stopDrag()
   
   if (audioPlayer.value) {
     audioPlayer.value.playbackRate = 1
     audioPlayer.value.volume = 1
+  }
+})
+
+// Clean up on unmount
+onUnmounted(() => {
+  stopDrag()
+})
+
+// Disable loop if it becomes invalid
+watch([loopStart, loopEnd], () => {
+  if (!isLoopValid.value) {
+    loopEnabled.value = false
   }
 })
 
@@ -255,6 +511,11 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.progress-wrapper {
+  position: relative;
+  width: 100%;
+}
+
 .time-display {
   display: flex;
   justify-content: space-between;
@@ -303,6 +564,74 @@ onMounted(() => {
 .progress-bar::-moz-range-thumb:hover {
   background: #764ba2;
   transform: scale(1.2);
+}
+
+.loop-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.loop-marker {
+  position: absolute;
+  top: -4px;
+  width: 12px;
+  height: 16px;
+  background: #ff6b6b;
+  border-radius: 6px;
+  transform: translateX(-50%);
+  z-index: 3;
+  cursor: grab;
+  pointer-events: auto;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.loop-marker:hover {
+  transform: translateX(-50%) scale(1.2);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.loop-marker.dragging {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(1.3);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  z-index: 4;
+}
+
+.loop-start {
+  background: #51cf66;
+}
+
+.loop-start:hover {
+  background: #40c057;
+}
+
+.loop-end:hover {
+  background: #ff5252;
+}
+
+.loop-range {
+  position: absolute;
+  top: 0;
+  height: 8px;
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 4px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.loop-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: #667eea;
+  font-weight: 600;
 }
 
 .volume-control {
@@ -460,6 +789,131 @@ onMounted(() => {
   font-size: 1.2em;
 }
 
+.loop-controls {
+  background: #f8f9ff;
+  padding: 30px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+}
+
+.loop-controls h3 {
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center;
+  font-size: 1.5em;
+}
+
+.loop-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.loop-btn {
+  background: white;
+  border: 2px solid #667eea;
+  color: #667eea;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  min-width: 140px;
+}
+
+.loop-btn:hover {
+  background: #f0f2ff;
+  transform: translateY(-2px);
+}
+
+.loop-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #764ba2;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.loop-btn.loop-clear {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.loop-btn.loop-clear:hover {
+  background: #fff5f5;
+}
+
+.loop-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.loop-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.loop-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+  background-color: #ccc;
+  border-radius: 34px;
+  transition: 0.4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+.loop-switch input:checked + .slider {
+  background-color: #667eea;
+}
+
+.loop-switch input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.loop-switch input:disabled + .slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.label-text {
+  font-weight: 600;
+  color: #333;
+  font-size: 1em;
+}
+
+.loop-warning {
+  font-size: 0.85em;
+  color: #ff6b6b;
+  font-weight: 600;
+  text-align: center;
+}
+
 @media (max-width: 600px) {
   .speed-buttons {
     gap: 8px;
@@ -473,6 +927,14 @@ onMounted(() => {
 
   .custom-speed {
     flex-direction: column;
+  }
+
+  .loop-buttons {
+    flex-direction: column;
+  }
+
+  .loop-btn {
+    width: 100%;
   }
 }
 </style>
