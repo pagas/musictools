@@ -26,7 +26,12 @@
           <span>{{ formatTime(currentTime) }}</span>
           <span>{{ formatTime(duration) }}</span>
         </div>
-        <div class="progress-wrapper">
+        <div class="progress-wrapper" ref="progressWrapper">
+          <canvas
+            ref="waveformCanvas"
+            class="waveform-canvas"
+            @click="seekOnCanvas"
+          ></canvas>
           <input
             type="range"
             class="progress-bar"
@@ -39,7 +44,6 @@
           <div 
             class="loop-markers" 
             v-if="loopStart !== null || loopEnd !== null"
-            ref="progressWrapper"
             @mousedown.prevent="handleMarkerMouseDown"
             @touchstart.prevent="handleMarkerTouchStart"
           >
@@ -271,12 +275,167 @@ const loopStartInput = ref('')
 const loopEndInput = ref('')
 const isEditingStart = ref(false)
 const isEditingEnd = ref(false)
+const waveformCanvas = ref(null)
+const audioContext = ref(null)
+const waveformData = ref(null)
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 const audioUrl = computed(() => {
   return URL.createObjectURL(props.file)
 })
+
+// Initialize audio context for waveform preprocessing
+const initAudioContext = () => {
+  if (!audioPlayer.value) return
+  
+  try {
+    // Create audio context (only needed for decoding audio)
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    audioContext.value = new AudioContextClass()
+    
+    // Pre-process waveform data when metadata is loaded
+    preprocessWaveform()
+  } catch (error) {
+    console.error('Error initializing audio context:', error)
+  }
+}
+
+// Pre-process waveform data for visualization
+const preprocessWaveform = async () => {
+  if (!audioPlayer.value || !duration.value) return
+  
+  try {
+    // Decode audio file to get raw audio data
+    const arrayBuffer = await props.file.arrayBuffer()
+    const audioBuffer = await audioContext.value.decodeAudioData(arrayBuffer)
+    
+    // Get channel data (use first channel)
+    const rawData = audioBuffer.getChannelData(0)
+    const samples = 500 // Number of sample points for waveform
+    const blockSize = Math.floor(rawData.length / samples)
+    const filteredData = []
+    
+    // Downsample and get peak values
+    for (let i = 0; i < samples; i++) {
+      const blockStart = blockSize * i
+      let sum = 0
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[blockStart + j])
+      }
+      filteredData.push(sum / blockSize)
+    }
+    
+    // Normalize
+    const max = Math.max(...filteredData)
+    waveformData.value = filteredData.map(n => n / max)
+    
+    // Draw initial waveform
+    drawWaveform()
+  } catch (error) {
+    console.error('Error preprocessing waveform:', error)
+  }
+}
+
+// Draw waveform on canvas
+const drawWaveform = () => {
+  if (!waveformCanvas.value || !duration.value) return
+  
+  const canvas = waveformCanvas.value
+  const ctx = canvas.getContext('2d')
+  const width = canvas.width = canvas.offsetWidth
+  const height = canvas.height = canvas.offsetHeight
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, width, height)
+  
+  // Draw background
+  ctx.fillStyle = '#f0f2ff'
+  ctx.fillRect(0, 0, width, height)
+  
+  // Draw waveform if data is available
+  if (waveformData.value && waveformData.value.length > 0) {
+    const barWidth = width / waveformData.value.length
+    const centerY = height / 2
+    
+    ctx.fillStyle = '#667eea'
+    ctx.strokeStyle = '#667eea'
+    ctx.lineWidth = 1
+    
+    waveformData.value.forEach((value, i) => {
+      const barHeight = value * centerY * 0.8 // Scale to 80% of half height
+      const x = i * barWidth
+      
+      // Draw vertical line (waveform bar)
+      ctx.beginPath()
+      ctx.moveTo(x, centerY - barHeight)
+      ctx.lineTo(x, centerY + barHeight)
+      ctx.stroke()
+    })
+  }
+  
+  // Draw progress indicator
+  if (currentTime.value > 0 && duration.value > 0) {
+    const progress = currentTime.value / duration.value
+    const progressX = progress * width
+    
+    ctx.fillStyle = 'rgba(118, 75, 162, 0.3)'
+    ctx.fillRect(0, 0, progressX, height)
+    
+    // Draw progress line
+    ctx.strokeStyle = '#764ba2'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(progressX, 0)
+    ctx.lineTo(progressX, height)
+    ctx.stroke()
+  }
+  
+  // Draw loop markers
+  if (loopStart.value !== null && duration.value > 0) {
+    const startX = (loopStart.value / duration.value) * width
+    ctx.strokeStyle = '#51cf66'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(startX, 0)
+    ctx.lineTo(startX, height)
+    ctx.stroke()
+  }
+  
+  if (loopEnd.value !== null && duration.value > 0) {
+    const endX = (loopEnd.value / duration.value) * width
+    ctx.strokeStyle = '#ff6b6b'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(endX, 0)
+    ctx.lineTo(endX, height)
+    ctx.stroke()
+  }
+  
+  // Draw loop range highlight
+  if (loopStart.value !== null && loopEnd.value !== null && duration.value > 0) {
+    const startX = (loopStart.value / duration.value) * width
+    const endX = (loopEnd.value / duration.value) * width
+    ctx.fillStyle = 'rgba(102, 126, 234, 0.2)'
+    ctx.fillRect(startX, 0, endX - startX, height)
+  }
+}
+
+
+// Seek on canvas click
+const seekOnCanvas = (event) => {
+  if (!waveformCanvas.value || !duration.value) return
+  
+  const canvas = waveformCanvas.value
+  const rect = canvas.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const percentage = Math.max(0, Math.min(1, x / rect.width))
+  const seekTime = percentage * duration.value
+  
+  if (audioPlayer.value) {
+    audioPlayer.value.currentTime = seekTime
+  }
+}
 
 const togglePlayPause = () => {
   if (audioPlayer.value.paused) {
@@ -288,11 +447,20 @@ const togglePlayPause = () => {
 
 const handleLoadedMetadata = () => {
   duration.value = audioPlayer.value.duration
+  // Initialize audio context and waveform after metadata is loaded
+  if (audioContext.value === null) {
+    initAudioContext()
+  } else {
+    preprocessWaveform()
+  }
 }
 
 const updateProgress = () => {
   if (audioPlayer.value) {
     currentTime.value = audioPlayer.value.currentTime
+    
+    // Update waveform progress (static visualization only)
+    drawWaveform()
     
     // Check if we need to loop
     if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
@@ -705,6 +873,13 @@ watch(() => props.file, () => {
   loopEndInput.value = ''
   isEditingStart.value = false
   isEditingEnd.value = false
+  waveformData.value = null
+  
+  // Clean up audio context
+  if (audioContext.value) {
+    audioContext.value.close().catch(() => {})
+    audioContext.value = null
+  }
   
   // Clean up event listeners
   stopDrag()
@@ -731,6 +906,27 @@ onMounted(() => {
   if (audioPlayer.value) {
     audioPlayer.value.volume = 1
   }
+  
+  // Draw initial waveform when canvas is ready
+  if (waveformCanvas.value) {
+    drawWaveform()
+  }
+  
+  // Redraw waveform on window resize
+  const handleResize = () => {
+    if (waveformCanvas.value) {
+      if (isPlaying.value) {
+        drawWaveform()
+      } else {
+        drawWaveform()
+      }
+    }
+  }
+  window.addEventListener('resize', handleResize)
+  
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
 })
 </script>
 
@@ -795,6 +991,19 @@ onMounted(() => {
 .progress-wrapper {
   position: relative;
   width: 100%;
+  height: 120px;
+  margin-bottom: 10px;
+}
+
+.waveform-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border-radius: 8px;
+  background: #f0f2ff;
 }
 
 .time-display {
@@ -807,13 +1016,18 @@ onMounted(() => {
 }
 
 .progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: 8px;
   border-radius: 5px;
-  background: #e0e0e0;
+  background: transparent;
   outline: none;
   -webkit-appearance: none;
   cursor: pointer;
+  z-index: 5;
+  opacity: 0.7;
 }
 
 .progress-bar::-webkit-slider-thumb {
@@ -852,24 +1066,37 @@ onMounted(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 8px;
+  height: 100%;
   pointer-events: auto;
   cursor: pointer;
+  z-index: 3;
 }
 
 .loop-marker {
   position: absolute;
+  top: 0;
+  width: 12px;
+  height: 100%;
+  background: transparent;
+  transform: translateX(-50%);
+  z-index: 4;
+  cursor: grab;
+  pointer-events: auto;
+  transition: transform 0.1s ease;
+}
+
+.loop-marker::before {
+  content: '';
+  position: absolute;
   top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 12px;
   height: 16px;
   background: #ff6b6b;
   border-radius: 6px;
-  transform: translateX(-50%);
-  z-index: 3;
-  cursor: grab;
-  pointer-events: auto;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
 }
 
 .loop-marker:hover {
@@ -884,23 +1111,27 @@ onMounted(() => {
   z-index: 4;
 }
 
-.loop-start {
+.loop-start::before {
   background: #51cf66;
 }
 
-.loop-start:hover {
+.loop-start:hover::before {
   background: #40c057;
 }
 
-.loop-end:hover {
+.loop-end::before {
+  background: #ff6b6b;
+}
+
+.loop-end:hover::before {
   background: #ff5252;
 }
 
 .loop-range {
   position: absolute;
   top: 0;
-  height: 8px;
-  background: rgba(102, 126, 234, 0.2);
+  height: 100%;
+  background: rgba(102, 126, 234, 0.15);
   border-radius: 4px;
   z-index: 1;
   pointer-events: none;
