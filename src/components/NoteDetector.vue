@@ -6,7 +6,6 @@
       {{ isNoteDetectionActive ? 'Active' : 'Inactive' }}
     </span>
     <span class="note-value" v-if="detectedNote">{{ detectedNote }}</span>
-    <span class="note-frequency" v-if="detectedFrequency">({{ detectedFrequency.toFixed(1) }} Hz)</span>
     <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">No note detected</span>
   </div>
 </template>
@@ -104,12 +103,6 @@ defineProps({
   font-weight: 700;
   font-size: 1.1em;
   letter-spacing: 0.5px;
-}
-
-.note-frequency {
-  color: #666;
-  font-size: 0.85em;
-  font-weight: 500;
 }
 
 .note-placeholder {
