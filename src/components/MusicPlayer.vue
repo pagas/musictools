@@ -26,6 +26,16 @@
           <span>{{ formatTime(currentTime) }}</span>
           <span>{{ formatTime(duration) }}</span>
         </div>
+        <div class="note-display" v-if="isNoteDetectionActive || detectedNote">
+          <span class="note-label">Note:</span>
+          <span class="note-status" :class="{ active: isNoteDetectionActive, inactive: !isNoteDetectionActive }">
+            <span class="status-dot"></span>
+            {{ isNoteDetectionActive ? 'Active' : 'Inactive' }}
+          </span>
+          <span class="note-value" v-if="detectedNote">{{ detectedNote }}</span>
+          <span class="note-frequency" v-if="detectedFrequency">({{ detectedFrequency.toFixed(1) }} Hz)</span>
+          <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">No note detected</span>
+        </div>
         <div class="progress-wrapper" ref="progressWrapper">
           <canvas
             ref="waveformCanvas"
@@ -391,6 +401,23 @@ const zoomLevel = ref(1)
 const zoomOffset = ref(0)
 const isClick = ref(false)
 const clickStartTime = ref(0)
+const analyser = ref(null)
+const sourceNode = ref(null)
+const dataArray = ref(null)
+const animationFrameId = ref(null)
+const detectedNote = ref('')
+const detectedFrequency = ref(0)
+
+// Track if note detection should be active (reactive flag)
+const noteDetectionActive = ref(false)
+
+// Computed property to check if note detection is currently active
+const isNoteDetectionActive = computed(() => {
+  return noteDetectionActive.value && 
+         !!audioPlayer.value && 
+         !audioPlayer.value.paused && 
+         !!analyser.value
+})
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
@@ -514,20 +541,200 @@ const handleScrollbarInput = (event) => {
   drawWaveform()
 }
 
-// Initialize audio context for waveform preprocessing
+// Initialize audio context for waveform preprocessing and note detection
 const initAudioContext = () => {
   if (!audioPlayer.value) return
   
   try {
-    // Create audio context (only needed for decoding audio)
+    // Create audio context for decoding and real-time analysis
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
     audioContext.value = new AudioContextClass()
     
     // Pre-process waveform data when metadata is loaded
     preprocessWaveform()
+    
+    // Set up analyser for real-time note detection
+    setupAudioAnalysis()
   } catch (error) {
     console.error('Error initializing audio context:', error)
   }
+}
+
+// Set up audio analysis for real-time note detection
+const setupAudioAnalysis = () => {
+  if (!audioPlayer.value || !audioContext.value) return
+  
+  try {
+    // Create analyser node
+    analyser.value = audioContext.value.createAnalyser()
+    analyser.value.fftSize = 8192 // Higher resolution for better pitch detection
+    analyser.value.smoothingTimeConstant = 0.3
+    
+    // Create buffer for frequency data (for FFT-based detection)
+    const bufferLength = analyser.value.frequencyBinCount
+    dataArray.value = new Uint8Array(bufferLength) // Used for frequency data now
+    
+    // Create source node from audio element
+    // Note: createMediaElementSource automatically disconnects the audio element
+    // from its default destination, so we need to connect through analyser to destination
+    if (sourceNode.value) {
+      sourceNode.value.disconnect()
+    }
+    sourceNode.value = audioContext.value.createMediaElementSource(audioPlayer.value)
+    sourceNode.value.connect(analyser.value)
+    // Connect analyser to destination so audio still plays
+    analyser.value.connect(audioContext.value.destination)
+    
+    // Start note detection if playing
+    if (!audioPlayer.value.paused) {
+      // Resume audio context if suspended
+      if (audioContext.value.state === 'suspended') {
+        audioContext.value.resume()
+      }
+      startNoteDetection()
+    }
+  } catch (error) {
+    console.error('Error setting up audio analysis:', error)
+  }
+}
+
+// Convert frequency to musical note name
+const frequencyToNote = (frequency) => {
+  if (!frequency || frequency < 20 || frequency > 20000) {
+    return null
+  }
+  
+  // A4 = 440 Hz
+  const A4 = 440
+  const semitonesFromA4 = 12 * Math.log2(frequency / A4)
+  const noteNumber = Math.round(semitonesFromA4) + 69 // MIDI note number (A4 = 69)
+  
+  // Ensure note number is in valid range (MIDI 0-127)
+  const clampedNoteNumber = Math.max(0, Math.min(127, noteNumber))
+  
+  // Calculate octave and note name
+  const octave = Math.floor((clampedNoteNumber - 12) / 12)
+  const noteIndex = clampedNoteNumber % 12
+  
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+  const noteName = noteNames[noteIndex]
+  
+  return `${noteName}${octave}`
+}
+
+// Detect pitch using FFT-based frequency analysis
+const detectPitch = () => {
+  if (!analyser.value || !dataArray.value || !audioContext.value) return null
+  
+  // Get frequency data instead of time domain
+  const frequencyData = new Uint8Array(analyser.value.frequencyBinCount)
+  analyser.value.getByteFrequencyData(frequencyData)
+  
+  const sampleRate = audioContext.value.sampleRate
+  const bufferLength = frequencyData.length
+  const nyquist = sampleRate / 2
+  const binSize = nyquist / bufferLength
+  
+  // Find the peak frequency (fundamental)
+  let maxMagnitude = 0
+  let peakBin = 0
+  
+  // Search in musical frequency range (80 Hz to 2000 Hz)
+  const minBin = Math.floor(80 / binSize)
+  const maxBin = Math.min(Math.floor(2000 / binSize), bufferLength - 1)
+  
+  for (let i = minBin; i <= maxBin; i++) {
+    if (frequencyData[i] > maxMagnitude) {
+      maxMagnitude = frequencyData[i]
+      peakBin = i
+    }
+  }
+  
+  // Check if signal is strong enough (threshold: at least 30% of max)
+  // This helps filter out noise
+  if (maxMagnitude < 50) { // Minimum threshold (0-255 scale)
+    return null
+  }
+  
+  // Calculate frequency from bin
+  const frequency = peakBin * binSize
+  
+  // Try to find the fundamental frequency by looking for harmonics
+  // Check if there's a lower frequency that's a divisor of the peak
+  let fundamentalFrequency = frequency
+  let bestScore = 0
+  
+  // Check potential fundamentals (divide by common harmonics: 2, 3, 4, 5)
+  for (let divisor = 1; divisor <= 5; divisor++) {
+    const candidateFreq = frequency / divisor
+    
+    // Make sure candidate is in valid range
+    if (candidateFreq < 80 || candidateFreq > 2000) continue
+    
+    const candidateBin = Math.floor(candidateFreq / binSize)
+    if (candidateBin >= 0 && candidateBin < bufferLength) {
+      // Score based on magnitude and how well it divides
+      const magnitude = frequencyData[candidateBin]
+      const score = magnitude / divisor // Penalize higher harmonics
+      
+      if (score > bestScore && magnitude > 40) {
+        bestScore = score
+        fundamentalFrequency = candidateFreq
+      }
+    }
+  }
+  
+  return fundamentalFrequency
+}
+
+// Start note detection loop
+const startNoteDetection = () => {
+  if (!audioPlayer.value || audioPlayer.value.paused || !analyser.value) {
+    noteDetectionActive.value = false
+    return
+  }
+  
+  // Set flag to active
+  noteDetectionActive.value = true
+  
+  const detect = () => {
+    if (!audioPlayer.value || audioPlayer.value.paused) {
+      noteDetectionActive.value = false
+      detectedNote.value = ''
+      detectedFrequency.value = 0
+      if (animationFrameId.value) {
+        cancelAnimationFrame(animationFrameId.value)
+        animationFrameId.value = null
+      }
+      return
+    }
+    
+    const frequency = detectPitch()
+    if (frequency && frequency >= 80 && frequency <= 2000) {
+      detectedFrequency.value = frequency
+      const note = frequencyToNote(frequency)
+      detectedNote.value = note || ''
+    } else {
+      // Keep previous values for a short time to avoid flickering
+      // Only clear if we consistently get no signal
+      detectedNote.value = ''
+      detectedFrequency.value = 0
+    }
+    
+    animationFrameId.value = requestAnimationFrame(detect)
+  }
+  
+  detect()
+}
+
+// Stop note detection
+const stopNoteDetection = () => {
+  if (animationFrameId.value) {
+    cancelAnimationFrame(animationFrameId.value)
+    animationFrameId.value = null
+  }
+  detectedNote.value = ''
+  detectedFrequency.value = 0
 }
 
 // Pre-process waveform data for visualization
@@ -903,8 +1110,17 @@ const handleWheelZoom = (event) => {
 const togglePlayPause = () => {
   if (audioPlayer.value.paused) {
     audioPlayer.value.play()
+    // Resume audio context if suspended (required for autoplay policies)
+    if (audioContext.value && audioContext.value.state === 'suspended') {
+      audioContext.value.resume()
+    }
+    // Start note detection if analyser is set up
+    if (analyser.value) {
+      startNoteDetection()
+    }
   } else {
     audioPlayer.value.pause()
+    stopNoteDetection()
   }
 }
 
@@ -915,6 +1131,10 @@ const handleLoadedMetadata = () => {
     initAudioContext()
   } else {
     preprocessWaveform()
+    // Set up analysis if not already done
+    if (!analyser.value) {
+      setupAudioAnalysis()
+    }
   }
 }
 
@@ -974,6 +1194,9 @@ const updateVolume = (event) => {
 }
 
 const handleEnded = () => {
+  // Stop note detection when audio ends
+  stopNoteDetection()
+  
   // If loop is enabled and valid, restart from loop start
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
     if (audioPlayer.value) {
@@ -985,6 +1208,10 @@ const handleEnded = () => {
             audioPlayer.value.play().catch(() => {
               // Ignore play promise errors (e.g., user interaction required)
             })
+            // Restart note detection after looping
+            if (analyser.value) {
+              startNoteDetection()
+            }
           }
         }
       })
@@ -1405,6 +1632,19 @@ watch(() => props.file, () => {
   isEditingEnd.value = false
   waveformData.value = null
   
+  // Stop note detection
+  stopNoteDetection()
+  detectedNote.value = ''
+  detectedFrequency.value = 0
+  
+  // Clean up audio nodes
+  if (sourceNode.value) {
+    sourceNode.value.disconnect()
+    sourceNode.value = null
+  }
+  analyser.value = null
+  dataArray.value = null
+  
   // Clean up audio context
   if (audioContext.value) {
     audioContext.value.close().catch(() => {})
@@ -1428,6 +1668,21 @@ watch(() => props.file, () => {
 // Clean up on unmount
 onUnmounted(() => {
   stopDrag()
+  stopNoteDetection()
+  
+  // Clean up audio nodes
+  if (sourceNode.value) {
+    sourceNode.value.disconnect()
+    sourceNode.value = null
+  }
+  analyser.value = null
+  dataArray.value = null
+  
+  // Clean up audio context
+  if (audioContext.value) {
+    audioContext.value.close().catch(() => {})
+    audioContext.value = null
+  }
 })
 
 // Disable loop if it becomes invalid
@@ -1622,6 +1877,94 @@ onMounted(() => {
   font-size: 0.9em;
   color: #666;
   font-weight: 600;
+}
+
+.note-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  font-size: 0.95em;
+  min-height: 32px;
+  flex-wrap: wrap;
+}
+
+.note-label {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.note-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.note-status.active {
+  color: #51cf66;
+  background: rgba(81, 207, 102, 0.15);
+}
+
+.note-status.inactive {
+  color: #999;
+  background: rgba(153, 153, 153, 0.1);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.note-status.active .status-dot {
+  background: #51cf66;
+  box-shadow: 0 0 6px rgba(81, 207, 102, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.note-status.inactive .status-dot {
+  background: #999;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.note-value {
+  color: #333;
+  font-weight: 700;
+  font-size: 1.1em;
+  letter-spacing: 0.5px;
+}
+
+.note-frequency {
+  color: #666;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.note-placeholder {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
 }
 
 .loop-markers {
