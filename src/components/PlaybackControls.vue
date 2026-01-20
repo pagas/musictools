@@ -83,6 +83,5 @@ defineEmits(['togglePlayPause'])
   color: #666;
   font-weight: 600;
   width: 100%;
-  max-width: 500px;
 }
 </style>
