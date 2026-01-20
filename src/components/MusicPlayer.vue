@@ -30,8 +30,67 @@
           <canvas
             ref="waveformCanvas"
             class="waveform-canvas"
-            @click="seekOnCanvas"
+            :class="{ 'panning': isPanning, 'zoomable': zoomLevel > 1 }"
+            @click="handleCanvasClick"
+            @wheel.prevent="handleWheelZoom"
+            @mousedown="handleCanvasMouseDown"
+            @mousemove="handleCanvasMouseMove"
+            @mouseup="handleCanvasMouseUp"
+            @mouseleave="handleCanvasMouseUp"
           ></canvas>
+          <div class="zoom-controls">
+            <button 
+              class="zoom-btn" 
+              @click="zoomOut"
+              :disabled="zoomLevel <= 1"
+              title="Zoom Out"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+              </svg>
+            </button>
+            <span class="zoom-level">{{ zoomLevel.toFixed(1) }}x</span>
+            <button 
+              class="zoom-btn" 
+              @click="zoomIn"
+              :disabled="zoomLevel >= 10"
+              title="Zoom In"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="11" y1="8" x2="11" y2="14"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+              </svg>
+            </button>
+            <button 
+              class="zoom-btn zoom-reset" 
+              @click="resetZoom"
+              :disabled="zoomLevel === 1 && zoomOffset === 0"
+              title="Reset Zoom"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                <path d="M3 21v-5h5"></path>
+              </svg>
+            </button>
+            <button 
+              class="zoom-btn zoom-fit" 
+              @click="zoomToLoop"
+              :disabled="loopStart === null || loopEnd === null"
+              title="Zoom to Loop"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <path d="M8 12h8"></path>
+                <path d="M12 8v8"></path>
+              </svg>
+            </button>
+          </div>
           <div 
             class="loop-markers" 
             v-if="loopStart !== null || loopEnd !== null"
@@ -44,8 +103,8 @@
               :class="{ dragging: draggingMarker === 'start' }"
               :style="{ left: `${(loopStart / duration) * 100}%` }"
               :title="`Loop Start: ${formatTime(loopStart)} - Drag to adjust`"
-              @mousedown.stop="startDrag('start', $event)"
-              @touchstart.stop="startDrag('start', $event)"
+              @mousedown.stop.prevent="startDrag('start', $event)"
+              @touchstart.stop.prevent="startDrag('start', $event)"
             ></div>
             <div 
               v-if="loopEnd !== null"
@@ -53,8 +112,8 @@
               :class="{ dragging: draggingMarker === 'end' }"
               :style="{ left: `${(loopEnd / duration) * 100}%` }"
               :title="`Loop End: ${formatTime(loopEnd)} - Drag to adjust`"
-              @mousedown.stop="startDrag('end', $event)"
-              @touchstart.stop="startDrag('end', $event)"
+              @mousedown.stop.prevent="startDrag('end', $event)"
+              @touchstart.stop.prevent="startDrag('end', $event)"
             ></div>
             <div 
               v-if="loopStart !== null && loopEnd !== null"
@@ -269,6 +328,13 @@ const isEditingEnd = ref(false)
 const waveformCanvas = ref(null)
 const audioContext = ref(null)
 const waveformData = ref(null)
+const zoomLevel = ref(1)
+const zoomOffset = ref(0)
+const isPanning = ref(false)
+const panStartX = ref(0)
+const panStartOffset = ref(0)
+const isClick = ref(false)
+const clickStartTime = ref(0)
 
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
@@ -328,7 +394,7 @@ const preprocessWaveform = async () => {
   }
 }
 
-// Draw waveform on canvas
+// Draw waveform on canvas with zoom support
 const drawWaveform = () => {
   if (!waveformCanvas.value || !duration.value) return
   
@@ -344,88 +410,340 @@ const drawWaveform = () => {
   ctx.fillStyle = '#f0f2ff'
   ctx.fillRect(0, 0, width, height)
   
+  // Calculate visible range based on zoom
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
+  const visibleStart = clampedOffset
+  const visibleEnd = clampedOffset + visibleDuration
+  
+  // Calculate scaling factors
+  const timeToPixel = width / visibleDuration
+  const pixelToTime = visibleDuration / width
+  
   // Draw waveform if data is available
   if (waveformData.value && waveformData.value.length > 0) {
-    const barWidth = width / waveformData.value.length
     const centerY = height / 2
+    const sampleDuration = duration.value / waveformData.value.length
     
     ctx.fillStyle = '#667eea'
     ctx.strokeStyle = '#667eea'
     ctx.lineWidth = 1
     
-    waveformData.value.forEach((value, i) => {
-      const barHeight = value * centerY * 0.8 // Scale to 80% of half height
-      const x = i * barWidth
+    // Calculate which samples to draw
+    const startSample = Math.floor(visibleStart / sampleDuration)
+    const endSample = Math.ceil(visibleEnd / sampleDuration)
+    const samplesToDraw = endSample - startSample
+    
+    if (samplesToDraw > 0) {
+      const barWidth = width / samplesToDraw
       
-      // Draw vertical line (waveform bar)
-      ctx.beginPath()
-      ctx.moveTo(x, centerY - barHeight)
-      ctx.lineTo(x, centerY + barHeight)
-      ctx.stroke()
-    })
+      for (let i = startSample; i < endSample && i < waveformData.value.length; i++) {
+        const value = waveformData.value[i]
+        const barHeight = value * centerY * 0.8
+        const sampleTime = i * sampleDuration
+        const x = (sampleTime - visibleStart) * timeToPixel
+        
+        // Draw vertical line (waveform bar)
+        if (x >= -barWidth && x <= width + barWidth) {
+          ctx.beginPath()
+          ctx.moveTo(x, centerY - barHeight)
+          ctx.lineTo(x, centerY + barHeight)
+          ctx.stroke()
+        }
+      }
+    }
   }
   
   // Draw progress indicator
   if (currentTime.value > 0 && duration.value > 0) {
     const progress = currentTime.value / duration.value
-    const progressX = progress * width
+    let progressX = 0
+    
+    if (currentTime.value >= visibleStart && currentTime.value <= visibleEnd) {
+      progressX = (currentTime.value - visibleStart) * timeToPixel
+    } else if (currentTime.value < visibleStart) {
+      progressX = 0
+    } else {
+      progressX = width
+    }
     
     ctx.fillStyle = 'rgba(118, 75, 162, 0.3)'
-    ctx.fillRect(0, 0, progressX, height)
+    ctx.fillRect(0, 0, Math.max(0, progressX), height)
     
     // Draw progress line
-    ctx.strokeStyle = '#764ba2'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(progressX, 0)
-    ctx.lineTo(progressX, height)
-    ctx.stroke()
+    if (progressX >= 0 && progressX <= width) {
+      ctx.strokeStyle = '#764ba2'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(progressX, 0)
+      ctx.lineTo(progressX, height)
+      ctx.stroke()
+    }
   }
   
   // Draw loop markers
   if (loopStart.value !== null && duration.value > 0) {
-    const startX = (loopStart.value / duration.value) * width
-    ctx.strokeStyle = '#51cf66'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(startX, 0)
-    ctx.lineTo(startX, height)
-    ctx.stroke()
+    let startX = 0
+    if (loopStart.value >= visibleStart && loopStart.value <= visibleEnd) {
+      startX = (loopStart.value - visibleStart) * timeToPixel
+    } else if (loopStart.value < visibleStart) {
+      startX = -5 // Show as a small indicator on the left
+    } else {
+      startX = width + 5 // Show as a small indicator on the right
+    }
+    
+    if (startX >= -10 && startX <= width + 10) {
+      ctx.strokeStyle = '#51cf66'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(startX, 0)
+      ctx.lineTo(startX, height)
+      ctx.stroke()
+    }
   }
   
   if (loopEnd.value !== null && duration.value > 0) {
-    const endX = (loopEnd.value / duration.value) * width
-    ctx.strokeStyle = '#ff6b6b'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(endX, 0)
-    ctx.lineTo(endX, height)
-    ctx.stroke()
+    let endX = 0
+    if (loopEnd.value >= visibleStart && loopEnd.value <= visibleEnd) {
+      endX = (loopEnd.value - visibleStart) * timeToPixel
+    } else if (loopEnd.value < visibleStart) {
+      endX = -5
+    } else {
+      endX = width + 5
+    }
+    
+    if (endX >= -10 && endX <= width + 10) {
+      ctx.strokeStyle = '#ff6b6b'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(endX, 0)
+      ctx.lineTo(endX, height)
+      ctx.stroke()
+    }
   }
   
   // Draw loop range highlight
   if (loopStart.value !== null && loopEnd.value !== null && duration.value > 0) {
-    const startX = (loopStart.value / duration.value) * width
-    const endX = (loopEnd.value / duration.value) * width
-    ctx.fillStyle = 'rgba(102, 126, 234, 0.2)'
-    ctx.fillRect(startX, 0, endX - startX, height)
+    const startX = Math.max(0, (loopStart.value - visibleStart) * timeToPixel)
+    const endX = Math.min(width, (loopEnd.value - visibleStart) * timeToPixel)
+    
+    if (endX > startX) {
+      ctx.fillStyle = 'rgba(102, 126, 234, 0.2)'
+      ctx.fillRect(startX, 0, endX - startX, height)
+    }
   }
 }
 
 
-// Seek on canvas click
-const seekOnCanvas = (event) => {
+// Handle canvas click or pan
+const handleCanvasClick = (event) => {
+  // Only seek if it was a click (not a drag) and not zoomed in
+  if (!isClick.value || zoomLevel.value > 1) return
+  
   if (!waveformCanvas.value || !duration.value) return
   
   const canvas = waveformCanvas.value
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
-  const percentage = Math.max(0, Math.min(1, x / rect.width))
-  const seekTime = percentage * duration.value
+  
+  // Calculate time based on zoom
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
+  const pixelToTime = visibleDuration / rect.width
+  const seekTime = clampedOffset + (x * pixelToTime)
   
   if (audioPlayer.value) {
-    audioPlayer.value.currentTime = seekTime
+    audioPlayer.value.currentTime = Math.max(0, Math.min(duration.value, seekTime))
   }
+}
+
+// Handle mouse down on canvas
+const handleCanvasMouseDown = (event) => {
+  if (!waveformCanvas.value || !duration.value) return
+  
+  // Don't start panning if dragging a marker
+  if (draggingMarker.value) return
+  
+  // If zoomed in, enable panning
+  if (zoomLevel.value > 1) {
+    isPanning.value = true
+    isClick.value = true
+    clickStartTime.value = Date.now()
+    panStartX.value = event.clientX
+    panStartOffset.value = zoomOffset.value
+    event.preventDefault()
+    waveformCanvas.value.style.cursor = 'grabbing'
+    
+    // Prevent text selection during pan
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'grabbing'
+  }
+}
+
+// Handle mouse move on canvas (for panning)
+const handleCanvasMouseMove = (event) => {
+  if (!waveformCanvas.value || !duration.value) return
+  
+  // Don't pan if dragging a marker
+  if (draggingMarker.value) return
+  
+  if (isPanning.value && zoomLevel.value > 1) {
+    isClick.value = false // It's a drag, not a click
+    
+    const deltaX = event.clientX - panStartX.value
+    const visibleDuration = duration.value / zoomLevel.value
+    const pixelToTime = visibleDuration / waveformCanvas.value.offsetWidth
+    const timeDelta = deltaX * pixelToTime
+    
+    const newOffset = panStartOffset.value - timeDelta
+    const maxOffset = Math.max(0, duration.value - visibleDuration)
+    zoomOffset.value = Math.max(0, Math.min(maxOffset, newOffset))
+    
+    drawWaveform()
+  } else if (zoomLevel.value > 1 && !draggingMarker.value) {
+    // Show grab cursor when hovering over zoomed waveform
+    waveformCanvas.value.style.cursor = 'grab'
+  } else if (!draggingMarker.value) {
+    waveformCanvas.value.style.cursor = 'pointer'
+  }
+}
+
+// Handle mouse up on canvas
+const handleCanvasMouseUp = () => {
+  if (isPanning.value) {
+    // Check if it was a quick click (less than 200ms) for seeking
+    const clickDuration = Date.now() - clickStartTime.value
+    if (clickDuration < 200 && isClick.value && zoomLevel.value === 1) {
+      // It was a click at normal zoom, allow seeking
+      // This will be handled by handleCanvasClick
+    }
+    
+    isPanning.value = false
+    
+    // Restore cursor and user selection
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    
+    if (waveformCanvas.value) {
+      waveformCanvas.value.style.cursor = zoomLevel.value > 1 && !draggingMarker.value ? 'grab' : 'pointer'
+    }
+  }
+}
+
+// Zoom functions
+const zoomIn = () => {
+  if (zoomLevel.value >= 10) return
+  
+  const oldZoom = zoomLevel.value
+  zoomLevel.value = Math.min(10, zoomLevel.value * 1.5)
+  
+  // Adjust offset to keep center point stable
+  const zoomChange = zoomLevel.value / oldZoom
+  const centerTime = zoomOffset.value + (duration.value / oldZoom / 2)
+  const newVisibleDuration = duration.value / zoomLevel.value
+  zoomOffset.value = Math.max(0, Math.min(
+    duration.value - newVisibleDuration,
+    centerTime - newVisibleDuration / 2
+  ))
+  
+  drawWaveform()
+}
+
+const zoomOut = () => {
+  if (zoomLevel.value <= 1) {
+    resetZoom()
+    return
+  }
+  
+  const oldZoom = zoomLevel.value
+  zoomLevel.value = Math.max(1, zoomLevel.value / 1.5)
+  
+  // Adjust offset to keep center point stable
+  const zoomChange = zoomLevel.value / oldZoom
+  const centerTime = zoomOffset.value + (duration.value / oldZoom / 2)
+  const newVisibleDuration = duration.value / zoomLevel.value
+  zoomOffset.value = Math.max(0, Math.min(
+    duration.value - newVisibleDuration,
+    centerTime - newVisibleDuration / 2
+  ))
+  
+  // If fully zoomed out, reset offset
+  if (zoomLevel.value === 1) {
+    zoomOffset.value = 0
+  }
+  
+  drawWaveform()
+}
+
+const resetZoom = () => {
+  zoomLevel.value = 1
+  zoomOffset.value = 0
+  drawWaveform()
+}
+
+const zoomToLoop = () => {
+  if (loopStart.value === null || loopEnd.value === null || !duration.value) return
+  
+  const loopDuration = loopEnd.value - loopStart.value
+  const centerTime = (loopStart.value + loopEnd.value) / 2
+  
+  // Calculate zoom level to fit loop with some padding
+  const padding = loopDuration * 0.2 // 20% padding
+  const targetVisibleDuration = loopDuration + padding
+  zoomLevel.value = Math.min(10, Math.max(1, duration.value / targetVisibleDuration))
+  
+  // Center on loop
+  const newVisibleDuration = duration.value / zoomLevel.value
+  zoomOffset.value = Math.max(0, Math.min(
+    duration.value - newVisibleDuration,
+    centerTime - newVisibleDuration / 2
+  ))
+  
+  drawWaveform()
+}
+
+const handleWheelZoom = (event) => {
+  if (!waveformCanvas.value || !duration.value) return
+  
+  event.preventDefault()
+  
+  const delta = event.deltaY > 0 ? 0.9 : 1.1
+  
+  if (delta > 1 && zoomLevel.value >= 10) return
+  if (delta < 1 && zoomLevel.value <= 1) {
+    if (zoomOffset.value === 0) return
+  }
+  
+  const oldZoom = zoomLevel.value
+  zoomLevel.value = Math.max(1, Math.min(10, zoomLevel.value * delta))
+  
+  // If zooming in, adjust offset to zoom towards mouse position
+  if (delta > 1) {
+    const rect = waveformCanvas.value.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseTime = zoomOffset.value + (mouseX / rect.width) * (duration.value / oldZoom)
+    
+    const newVisibleDuration = duration.value / zoomLevel.value
+    const maxOffset = Math.max(0, duration.value - newVisibleDuration)
+    zoomOffset.value = Math.max(0, Math.min(maxOffset, mouseTime - (mouseX / rect.width) * newVisibleDuration))
+  } else {
+    // Zooming out - keep center stable
+    const centerTime = zoomOffset.value + (duration.value / oldZoom / 2)
+    const newVisibleDuration = duration.value / zoomLevel.value
+    zoomOffset.value = Math.max(0, Math.min(
+      duration.value - newVisibleDuration,
+      centerTime - newVisibleDuration / 2
+    ))
+  }
+  
+  // Reset if fully zoomed out
+  if (zoomLevel.value === 1) {
+    zoomOffset.value = 0
+  }
+  
+  drawWaveform()
 }
 
 const togglePlayPause = () => {
@@ -732,11 +1050,21 @@ const getTimeFromPosition = (clientX) => {
   
   const rect = progressWrapper.value.getBoundingClientRect()
   const x = clientX - rect.left
-  const percentage = Math.max(0, Math.min(1, x / rect.width))
-  return percentage * duration.value
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
+  const pixelToTime = visibleDuration / rect.width
+  return clampedOffset + (x * pixelToTime)
 }
 
 const startDrag = (marker, event) => {
+  // Stop any panning
+  if (isPanning.value) {
+    isPanning.value = false
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+  }
+  
   draggingMarker.value = marker
   const clientX = event.touches ? event.touches[0].clientX : event.clientX
   updateMarkerPosition(clientX)
@@ -767,10 +1095,16 @@ const stopDrag = () => {
 }
 
 const updateMarkerPosition = (clientX) => {
-  if (!draggingMarker.value || !duration.value) return
+  if (!draggingMarker.value || !duration.value || !progressWrapper.value) return
   
-  const time = getTimeFromPosition(clientX)
-  if (time === null) return
+  // Calculate time accounting for zoom
+  const rect = progressWrapper.value.getBoundingClientRect()
+  const x = clientX - rect.left
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
+  const pixelToTime = visibleDuration / rect.width
+  const time = clampedOffset + (x * pixelToTime)
   
   if (draggingMarker.value === 'start') {
     const newStart = Math.max(0, Math.min(time, loopEnd.value !== null ? loopEnd.value - 0.1 : duration.value))
@@ -865,6 +1199,12 @@ watch(() => props.file, () => {
     audioContext.value.close().catch(() => {})
     audioContext.value = null
   }
+  
+  // Reset zoom
+  zoomLevel.value = 1
+  zoomOffset.value = 0
+  isPanning.value = false
+  isClick.value = false
   
   // Clean up event listeners
   stopDrag()
@@ -980,6 +1320,77 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 
+.zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.zoom-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667eea;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+}
+
+.zoom-btn:hover:not(:disabled) {
+  background: #f0f2ff;
+  transform: scale(1.1);
+}
+
+.zoom-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.zoom-level {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #667eea;
+  min-width: 35px;
+  text-align: center;
+}
+
+.zoom-reset,
+.zoom-fit {
+  margin-left: 4px;
+}
+
+.zoom-reset {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.zoom-fit {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
 .waveform-canvas {
   position: absolute;
   top: 0;
@@ -989,6 +1400,16 @@ onMounted(() => {
   cursor: pointer;
   border-radius: 8px;
   background: #f0f2ff;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.waveform-canvas.zoomable {
+  cursor: grab;
+}
+
+.waveform-canvas.panning {
+  cursor: grabbing;
 }
 
 .time-display {
