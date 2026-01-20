@@ -1,9 +1,10 @@
 <template>
   <div class="note-display">
     <span class="note-label">Note:</span>
-    <span class="previous-note" v-if="previousNote">
+    <span class="previous-note">
       <span class="previous-label">Previous:</span>
-      <span class="previous-value">{{ previousNote }}</span>
+      <span class="previous-value" v-if="previousNote">{{ previousNote }}</span>
+      <span class="previous-placeholder" v-else>—</span>
     </span>
     <span class="note-value" v-if="detectedNote">{{ detectedNote }}</span>
     <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">—</span>
@@ -32,8 +33,19 @@ const previousNote = ref('')
 
 // Watch for note changes and store previous note
 watch(() => props.detectedNote, (newNote, oldNote) => {
-  if (oldNote && oldNote !== newNote) {
+  if (oldNote && oldNote !== newNote && newNote) {
+    // Only store previous note if there's a new note detected
     previousNote.value = oldNote
+  } else if (!newNote) {
+    // Clear previous note when current note becomes empty
+    previousNote.value = ''
+  }
+})
+
+// Clear previous note when music stops
+watch(() => props.isNoteDetectionActive, (isActive) => {
+  if (!isActive) {
+    previousNote.value = ''
   }
 })
 </script>
@@ -93,5 +105,11 @@ watch(() => props.detectedNote, (newNote, oldNote) => {
   color: #666;
   font-weight: 600;
   font-size: 0.95em;
+}
+
+.previous-placeholder {
+  color: #999;
+  font-size: 0.95em;
+  font-weight: 500;
 }
 </style>
