@@ -276,13 +276,9 @@ const zoomToLoop = () => zoomToLoopFn(() => drawWaveform())
 const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, () => drawWaveform())
 const handleScrollbarInput = (event) => handleScrollbarInputFn(event, () => drawWaveform())
 
-// Canvas click handler with seek emit
+// Canvas click handler - composable handles seeking directly
 const handleCanvasClick = (event) => {
   handleCanvasClickBase(event)
-  // Emit seek event if needed
-  if (props.audioPlayer?.currentTime !== undefined) {
-    emit('seek', props.audioPlayer.currentTime)
-  }
 }
 
 // Drag handlers for loop markers

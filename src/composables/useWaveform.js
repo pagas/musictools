@@ -265,7 +265,7 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     const zoomOffsetVal = getValue(zoomOffset)
     const audioPlayerEl = getValue(audioPlayer)
     
-    if (!isClick.value || !waveformCanvas.value || !durationVal) return
+    if (!waveformCanvas.value || !durationVal || !audioPlayerEl) return
     
     const canvas = waveformCanvas.value
     const rect = canvas.getBoundingClientRect()
@@ -278,9 +278,7 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     const clickTime = clampedOffset + (x * pixelToTime)
     const validTime = Math.max(0, Math.min(durationVal, clickTime))
     
-    if (audioPlayerEl) {
-      audioPlayerEl.currentTime = validTime
-    }
+    audioPlayerEl.currentTime = validTime
   }
 
   // Handle mouse down on canvas
