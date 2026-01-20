@@ -55,6 +55,7 @@
             :isNoteDetectionActive="isNoteDetectionActive"
             :detectedNote="detectedNote"
             :detectedFrequency="detectedFrequency"
+            :currentTime="currentTime"
           />
         </div>
       </div>

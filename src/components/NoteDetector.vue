@@ -6,8 +6,8 @@
       <span class="previous-value" v-if="previousNote">{{ previousNote }}</span>
       <span class="previous-placeholder" v-else>—</span>
     </span>
-    <span class="note-value" v-if="detectedNote">{{ detectedNote }}</span>
-    <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">—</span>
+    <span class="note-value" v-if="currentNote">{{ currentNote }}</span>
+    <span class="note-placeholder" v-else>—</span>
   </div>
 </template>
 
@@ -26,27 +26,45 @@ const props = defineProps({
   detectedFrequency: {
     type: Number,
     default: 0
+  },
+  currentTime: {
+    type: Number,
+    default: 0
   }
 })
 
 const previousNote = ref('')
+const currentNote = ref('')
+const lastCurrentTime = ref(0)
 
-// Watch for note changes and store previous note
+// Watch for note changes and store previous/current notes
 watch(() => props.detectedNote, (newNote, oldNote) => {
-  if (oldNote && oldNote !== newNote && newNote) {
-    // Only store previous note if there's a new note detected
-    previousNote.value = oldNote
-  } else if (!newNote) {
-    // Clear previous note when current note becomes empty
-    previousNote.value = ''
+  if (newNote) {
+    // Store the new note as current
+    if (oldNote && oldNote !== newNote) {
+      // Store old note as previous when a new note is detected
+      previousNote.value = oldNote
+    }
+    currentNote.value = newNote
   }
+  // Don't clear currentNote when newNote becomes empty - keep it displayed
 })
 
-// Clear previous note when music stops
-watch(() => props.isNoteDetectionActive, (isActive) => {
-  if (!isActive) {
+// Clear notes when music restarts from beginning or when seeking while stopped
+watch(() => props.currentTime, (newTime, oldTime) => {
+  // Detect restart: time goes from non-zero to near-zero (within 0.1s)
+  if (oldTime > 0.1 && newTime < 0.1) {
     previousNote.value = ''
+    currentNote.value = ''
+  } else if (!props.isNoteDetectionActive && lastCurrentTime.value !== undefined) {
+    // Detect seek/jump: large change in time (> 0.5s) while music is stopped
+    const timeDiff = Math.abs(newTime - lastCurrentTime.value)
+    if (timeDiff > 0.5) {
+      previousNote.value = ''
+      currentNote.value = ''
+    }
   }
+  lastCurrentTime.value = newTime
 })
 </script>
 
