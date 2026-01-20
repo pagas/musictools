@@ -6,9 +6,9 @@
         class="waveform-canvas"
         @wheel.prevent="handleWheelZoom"
         @mousedown="handleCanvasMouseDownSelection"
-        @mousemove="handleCanvasMouseMove"
-        @mouseup="handleCanvasMouseUp"
-        @mouseleave="handleCanvasMouseUp"
+        @mousemove="handleCanvasMouseMoveWrapper"
+        @mouseup="handleCanvasMouseUpWrapper"
+        @mouseleave="handleCanvasMouseUpWrapper"
         @touchstart="handleCanvasMouseDownSelection"
       ></canvas>
       <div class="zoom-controls">
@@ -73,6 +73,7 @@
       <div 
         class="loop-markers" 
         v-if="loopStart !== null || loopEnd !== null"
+        :key="`${zoomLevel}-${zoomOffset}`"
       >
         <div 
           v-if="loopStart !== null"
@@ -359,6 +360,22 @@ const handleCanvasClick = (event) => {
   }
 }
 
+// Wrapper for canvas mouse up to avoid interfering with drag selection
+const handleCanvasMouseUpWrapper = (event) => {
+  // Don't interfere if we're in the middle of a drag selection
+  if (!isDraggingSelection.value) {
+    handleCanvasMouseUpBase(event)
+  }
+}
+
+// Wrapper for canvas mouse move to avoid interfering with drag selection
+const handleCanvasMouseMoveWrapper = (event) => {
+  // Don't interfere if we're in the middle of a drag selection
+  if (!isDraggingSelection.value) {
+    handleCanvasMouseMoveBase(event)
+  }
+}
+
 // Handle canvas mouse down - start drag selection if not clicking on marker
 const handleCanvasMouseDownSelection = (event) => {
   // Don't start selection if clicking on a marker or zoom controls
@@ -605,11 +622,22 @@ const getTimeFromPositionLocal = (clientX) => {
   
   const rect = progressWrapper.value.getBoundingClientRect()
   const x = clientX - rect.left
-  const visibleDuration = props.duration / zoomLevel.value
+  
+  const zoomLevelVal = zoomLevel.value
+  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
+  
+  if (!zoomLevelVal || zoomLevelVal <= 0) {
+    // No zoom, simple calculation
+    const pixelToTime = props.duration / rect.width
+    return Math.max(0, Math.min(props.duration, x * pixelToTime))
+  }
+  
+  const visibleDuration = props.duration / zoomLevelVal
   const maxOffset = Math.max(0, props.duration - visibleDuration)
-  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
   const pixelToTime = visibleDuration / rect.width
-  return clampedOffset + (x * pixelToTime)
+  const time = clampedOffset + (x * pixelToTime)
+  return Math.max(0, Math.min(props.duration, time))
 }
 
 onUnmounted(() => {
