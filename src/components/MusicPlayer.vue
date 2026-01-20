@@ -590,8 +590,11 @@ const drawWaveform = () => {
 
 // Handle canvas click or pan
 const handleCanvasClick = (event) => {
-  // Only seek if it was a click (not a drag) and not zoomed in
-  if (!isClick.value || zoomLevel.value > 1) return
+  // Only process clicks (not drags) at normal zoom level
+  if (!isClick.value) return
+  
+  // At zoomed in, clicking should not seek (panning is enabled)
+  if (zoomLevel.value > 1) return
   
   if (!waveformCanvas.value || !duration.value) return
   
@@ -599,15 +602,17 @@ const handleCanvasClick = (event) => {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
   
-  // Calculate time based on zoom
+  // Calculate time based on zoom (at normal zoom, offset is 0)
   const visibleDuration = duration.value / zoomLevel.value
   const maxOffset = Math.max(0, duration.value - visibleDuration)
   const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
   const pixelToTime = visibleDuration / rect.width
-  const seekTime = clampedOffset + (x * pixelToTime)
+  const clickTime = clampedOffset + (x * pixelToTime)
+  const validTime = Math.max(0, Math.min(duration.value, clickTime))
   
+  // Just seek to clicked position (don't set loop markers)
   if (audioPlayer.value) {
-    audioPlayer.value.currentTime = Math.max(0, Math.min(duration.value, seekTime))
+    audioPlayer.value.currentTime = validTime
   }
 }
 
@@ -618,11 +623,13 @@ const handleCanvasMouseDown = (event) => {
   // Don't start panning if dragging a marker
   if (draggingMarker.value) return
   
+  // Initialize click tracking for all clicks
+  isClick.value = true
+  clickStartTime.value = Date.now()
+  
   // If zoomed in, enable panning
   if (zoomLevel.value > 1) {
     isPanning.value = true
-    isClick.value = true
-    clickStartTime.value = Date.now()
     panStartX.value = event.clientX
     panStartOffset.value = zoomOffset.value
     event.preventDefault()
@@ -631,6 +638,10 @@ const handleCanvasMouseDown = (event) => {
     // Prevent text selection during pan
     document.body.style.userSelect = 'none'
     document.body.style.cursor = 'grabbing'
+  } else {
+    // At normal zoom, we'll set loop start on click (handled in handleCanvasClick)
+    // Just prevent default to avoid text selection
+    event.preventDefault()
   }
 }
 
@@ -642,12 +653,15 @@ const handleCanvasMouseMove = (event) => {
   if (draggingMarker.value) return
   
   if (isPanning.value && zoomLevel.value > 1) {
-    isClick.value = false // It's a drag, not a click
+    // Check if mouse has moved significantly (more than 3px) - it's a drag
+    const deltaX = Math.abs(event.clientX - panStartX.value)
+    if (deltaX > 3) {
+      isClick.value = false // It's a drag, not a click
+    }
     
-    const deltaX = event.clientX - panStartX.value
     const visibleDuration = duration.value / zoomLevel.value
     const pixelToTime = visibleDuration / waveformCanvas.value.offsetWidth
-    const timeDelta = deltaX * pixelToTime
+    const timeDelta = (event.clientX - panStartX.value) * pixelToTime
     
     const newOffset = panStartOffset.value - timeDelta
     const maxOffset = Math.max(0, duration.value - visibleDuration)
@@ -665,13 +679,6 @@ const handleCanvasMouseMove = (event) => {
 // Handle mouse up on canvas
 const handleCanvasMouseUp = () => {
   if (isPanning.value) {
-    // Check if it was a quick click (less than 200ms) for seeking
-    const clickDuration = Date.now() - clickStartTime.value
-    if (clickDuration < 200 && isClick.value && zoomLevel.value === 1) {
-      // It was a click at normal zoom, allow seeking
-      // This will be handled by handleCanvasClick
-    }
-    
     isPanning.value = false
     
     // Restore cursor and user selection
@@ -682,6 +689,11 @@ const handleCanvasMouseUp = () => {
       waveformCanvas.value.style.cursor = zoomLevel.value > 1 && !draggingMarker.value ? 'grab' : 'pointer'
     }
   }
+  
+  // Reset click flag after a short delay to allow click handler to fire
+  setTimeout(() => {
+    isClick.value = false
+  }, 50)
 }
 
 // Zoom functions
