@@ -205,39 +205,58 @@ defineExpose({
 })
 
 // Computed properties for loop marker positions
+// These must match the EXACT calculation in useWaveform.js drawWaveform function
 const loopStartPosition = computed(() => {
   if (props.loopStart === null || !props.duration) return '0%'
   
-  const start = props.loopStart
-  const visStart = visibleStartTime.value
-  const visEnd = visibleEndTime.value
-  const visDur = visibleDurationTime.value
+  // Use the exact same calculation as useWaveform.js
+  const durationVal = props.duration
+  const zoomLevelVal = zoomLevel.value
+  const zoomOffsetVal = zoomOffset.value
+  const loopStartVal = props.loopStart
   
-  if (start < visStart) {
+  const visibleDuration = durationVal / zoomLevelVal
+  const maxOffset = Math.max(0, durationVal - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
+  const visibleStart = clampedOffset
+  const visibleEnd = clampedOffset + visibleDuration
+  
+  // Match the exact logic from useWaveform.js
+  if (loopStartVal < visibleStart) {
     return '-6px'
-  } else if (start > visEnd) {
+  } else if (loopStartVal > visibleEnd) {
     return 'calc(100% + 6px)'
   } else {
-    const position = ((start - visStart) / visDur) * 100
-    return `${position}%`
+    // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
+    const position = ((loopStartVal - visibleStart) / visibleDuration) * 100
+    return `${Math.max(0, Math.min(100, position))}%`
   }
 })
 
 const loopEndPosition = computed(() => {
   if (props.loopEnd === null || !props.duration) return '0%'
   
-  const end = props.loopEnd
-  const visStart = visibleStartTime.value
-  const visEnd = visibleEndTime.value
-  const visDur = visibleDurationTime.value
+  // Use the exact same calculation as useWaveform.js
+  const durationVal = props.duration
+  const zoomLevelVal = zoomLevel.value
+  const zoomOffsetVal = zoomOffset.value
+  const loopEndVal = props.loopEnd
   
-  if (end < visStart) {
+  const visibleDuration = durationVal / zoomLevelVal
+  const maxOffset = Math.max(0, durationVal - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
+  const visibleStart = clampedOffset
+  const visibleEnd = clampedOffset + visibleDuration
+  
+  // Match the exact logic from useWaveform.js
+  if (loopEndVal < visibleStart) {
     return '-6px'
-  } else if (end > visEnd) {
+  } else if (loopEndVal > visibleEnd) {
     return 'calc(100% + 6px)'
   } else {
-    const position = ((end - visStart) / visDur) * 100
-    return `${position}%`
+    // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
+    const position = ((loopEndVal - visibleStart) / visibleDuration) * 100
+    return `${Math.max(0, Math.min(100, position))}%`
   }
 })
 
@@ -246,25 +265,32 @@ const loopRangeStyle = computed(() => {
     return { left: '0%', width: '0%' }
   }
   
-  const start = props.loopStart
-  const end = props.loopEnd
-  const visStart = visibleStartTime.value
-  const visEnd = visibleEndTime.value
-  const visDur = visibleDurationTime.value
+  // Use the exact same calculation as useWaveform.js
+  const durationVal = props.duration
+  const zoomLevelVal = zoomLevel.value
+  const zoomOffsetVal = zoomOffset.value
+  const loopStartVal = props.loopStart
+  const loopEndVal = props.loopEnd
   
-  const rangeStart = Math.max(start, visStart)
-  const rangeEnd = Math.min(end, visEnd)
+  const visibleDuration = durationVal / zoomLevelVal
+  const maxOffset = Math.max(0, durationVal - visibleDuration)
+  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
+  const visibleStart = clampedOffset
+  const visibleEnd = clampedOffset + visibleDuration
+  
+  const rangeStart = Math.max(loopStartVal, visibleStart)
+  const rangeEnd = Math.min(loopEndVal, visibleEnd)
   
   if (rangeEnd <= rangeStart) {
     return { left: '0%', width: '0%' }
   }
   
-  const left = ((rangeStart - visStart) / visDur) * 100
-  const width = ((rangeEnd - rangeStart) / visDur) * 100
+  const left = ((rangeStart - visibleStart) / visibleDuration) * 100
+  const width = ((rangeEnd - rangeStart) / visibleDuration) * 100
   
   return {
-    left: `${Math.max(0, left)}%`,
-    width: `${Math.min(100, width)}%`
+    left: `${Math.max(0, Math.min(100, left))}%`,
+    width: `${Math.max(0, Math.min(100, width))}%`
   }
 })
 
