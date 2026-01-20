@@ -12,48 +12,52 @@
     ></audio>
 
     <div class="player-controls">
-      <div class="volume-play-wrapper">
-        <button class="play-btn" @click="togglePlayPause">
-          <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
-          <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-          </svg>
-        </button>
-        <button 
-          class="seek-btn seek-start-btn" 
-          @click="seekToStart"
-          :disabled="!duration || duration === 0"
-          title="Go to Start"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="11 17 6 12 11 7"></polyline>
-            <polyline points="18 17 13 12 18 7"></polyline>
-          </svg>
-        </button>
-        <button 
-          class="seek-btn seek-end-btn" 
-          @click="seekToEnd"
-          :disabled="!duration || duration === 0"
-          title="Go to End"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="13 17 18 12 13 7"></polyline>
-            <polyline points="6 17 11 12 6 7"></polyline>
-          </svg>
-        </button>
-        <VolumeControl
-          :volume="volume"
-          @update:volume="updateVolume"
-        />
-      </div>
+      <div class="controls-layout">
+        <div class="volume-play-wrapper">
+          <button class="play-btn" @click="togglePlayPause">
+            <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          </button>
+          <button 
+            class="seek-btn seek-start-btn" 
+            @click="seekToStart"
+            :disabled="!duration || duration === 0"
+            title="Go to Start"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="11 17 6 12 11 7"></polyline>
+              <polyline points="18 17 13 12 18 7"></polyline>
+            </svg>
+          </button>
+          <button 
+            class="seek-btn seek-end-btn" 
+            @click="seekToEnd"
+            :disabled="!duration || duration === 0"
+            title="Go to End"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="13 17 18 12 13 7"></polyline>
+              <polyline points="6 17 11 12 6 7"></polyline>
+            </svg>
+          </button>
+          <VolumeControl
+            :volume="volume"
+            @update:volume="updateVolume"
+          />
+        </div>
 
-      <NoteDetector
-        :isNoteDetectionActive="isNoteDetectionActive"
-        :detectedNote="detectedNote"
-        :detectedFrequency="detectedFrequency"
-      />
+        <div class="note-display-column">
+          <NoteDetector
+            :isNoteDetectionActive="isNoteDetectionActive"
+            :detectedNote="detectedNote"
+            :detectedFrequency="detectedFrequency"
+          />
+        </div>
+      </div>
 
       <PlaybackControls
         :currentTime="currentTime"
@@ -366,11 +370,25 @@ onMounted(() => {
   margin-bottom: 30px;
 }
 
+.controls-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
 .volume-play-wrapper {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
+  gap: 15px;
+  flex: 0 0 auto;
+}
+
+.note-display-column {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  align-items: flex-start;
 }
 
 .play-btn {

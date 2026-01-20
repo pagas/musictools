@@ -31,8 +31,9 @@ defineProps({
 <style scoped>
 .note-display {
   display: flex;
+  flex: 1;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   margin-bottom: 10px;
   padding: 8px 12px;
