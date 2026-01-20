@@ -175,7 +175,7 @@
       </div>
       <div class="loop-time-inputs">
         <div class="time-input-group">
-          <label for="loopStartInput">Loop Start (MM:SS):</label>
+          <label for="loopStartInput">Loop Start (MM:SS or MM:SS.ms):</label>
           <div class="time-input-wrapper">
             <input
               id="loopStartInput"
@@ -185,36 +185,62 @@
               @input="handleLoopStartInput"
               @blur="applyLoopStartInput"
               @keypress.enter="applyLoopStartInput"
-              placeholder="0:00"
+              placeholder="0:00.0"
             />
             <div class="time-input-buttons">
-              <button 
-                type="button" 
-                class="time-btn time-btn-up" 
-                @click="incrementLoopStart"
-                :disabled="loopStart === null || duration === 0"
-                title="Increase by 1 second"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-              </button>
-              <button 
-                type="button" 
-                class="time-btn time-btn-down" 
-                @click="decrementLoopStart"
-                :disabled="loopStart === null || loopStart <= 0"
-                title="Decrease by 1 second"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
+              <div class="time-btn-group">
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-up" 
+                  @click="incrementLoopStart"
+                  :disabled="loopStart === null || duration === 0"
+                  title="Increase by 1 second"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-down" 
+                  @click="decrementLoopStart"
+                  :disabled="loopStart === null || loopStart <= 0"
+                  title="Decrease by 1 second"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="time-btn-group time-btn-group-ms">
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-up time-btn-ms" 
+                  @click="incrementLoopStartMs"
+                  :disabled="loopStart === null || duration === 0"
+                  title="Increase by 100 milliseconds"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-down time-btn-ms" 
+                  @click="decrementLoopStartMs"
+                  :disabled="loopStart === null || loopStart <= 0"
+                  title="Decrease by 100 milliseconds"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
         <div class="time-input-group">
-          <label for="loopEndInput">Loop End (MM:SS):</label>
+          <label for="loopEndInput">Loop End (MM:SS or MM:SS.ms):</label>
           <div class="time-input-wrapper">
             <input
               id="loopEndInput"
@@ -224,31 +250,57 @@
               @input="handleLoopEndInput"
               @blur="applyLoopEndInput"
               @keypress.enter="applyLoopEndInput"
-              placeholder="0:00"
+              placeholder="0:00.0"
             />
             <div class="time-input-buttons">
-              <button 
-                type="button" 
-                class="time-btn time-btn-up" 
-                @click="incrementLoopEnd"
-                :disabled="loopEnd === null || loopEnd >= duration || (loopStart !== null && loopEnd >= duration - 0.1)"
-                title="Increase by 1 second"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-              </button>
-              <button 
-                type="button" 
-                class="time-btn time-btn-down" 
-                @click="decrementLoopEnd"
-                :disabled="loopEnd === null || (loopStart !== null && loopEnd <= loopStart + 0.1)"
-                title="Decrease by 1 second"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
+              <div class="time-btn-group">
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-up" 
+                  @click="incrementLoopEnd"
+                  :disabled="loopEnd === null || loopEnd >= duration || (loopStart !== null && loopEnd >= duration - 0.1)"
+                  title="Increase by 1 second"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-down" 
+                  @click="decrementLoopEnd"
+                  :disabled="loopEnd === null || (loopStart !== null && loopEnd <= loopStart + 0.1)"
+                  title="Decrease by 1 second"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="time-btn-group time-btn-group-ms">
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-up time-btn-ms" 
+                  @click="incrementLoopEndMs"
+                  :disabled="loopEnd === null || loopEnd >= duration || (loopStart !== null && loopEnd >= duration - 0.001)"
+                  title="Increase by 100 milliseconds"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="time-btn time-btn-down time-btn-ms" 
+                  @click="decrementLoopEndMs"
+                  :disabled="loopEnd === null || (loopStart !== null && loopEnd <= loopStart + 0.001)"
+                  title="Decrease by 100 milliseconds"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -863,10 +915,15 @@ const applyCustomSpeed = () => {
 }
 
 const formatTime = (seconds) => {
-  if (isNaN(seconds)) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+  if (isNaN(seconds)) return '0:00.0'
+  const totalSeconds = Math.floor(seconds)
+  const mins = Math.floor(totalSeconds / 60)
+  const secs = totalSeconds % 60
+  const ms = Math.floor((seconds % 1) * 1000)
+  
+  // Always show milliseconds (as tenths of a second, 0-9)
+  const msTenths = Math.floor(ms / 100)
+  return `${mins}:${secs.toString().padStart(2, '0')}.${msTenths}`
 }
 
 const setLoopStart = () => {
@@ -911,13 +968,33 @@ const clearLoop = () => {
   loopEndInput.value = ''
 }
 
-// Parse time input (supports MM:SS format or plain seconds)
+// Parse time input (supports MM:SS, MM:SS.m, MM:SS.ms format or plain seconds)
 const parseTimeInput = (input) => {
   if (!input || input.trim() === '') return null
   
   const trimmed = input.trim()
   
-  // Check if it's in MM:SS format
+  // Check if it's in MM:SS.ms format (with milliseconds)
+  const timeMatchMs = trimmed.match(/^(\d+):(\d{2})\.(\d{1,3})$/)
+  if (timeMatchMs) {
+    const minutes = parseInt(timeMatchMs[1], 10)
+    const seconds = parseInt(timeMatchMs[2], 10)
+    const milliseconds = parseInt(timeMatchMs[3], 10)
+    if (seconds >= 0 && seconds < 60 && minutes >= 0 && milliseconds >= 0 && milliseconds < 1000) {
+      // Convert milliseconds to decimal seconds
+      const msDecimal = milliseconds / 1000
+      // Handle cases like "1:23.5" (500ms) vs "1:23.05" (50ms)
+      if (timeMatchMs[3].length === 1) {
+        return minutes * 60 + seconds + milliseconds / 10
+      } else if (timeMatchMs[3].length === 2) {
+        return minutes * 60 + seconds + milliseconds / 100
+      } else {
+        return minutes * 60 + seconds + msDecimal
+      }
+    }
+  }
+  
+  // Check if it's in MM:SS format (without milliseconds)
   const timeMatch = trimmed.match(/^(\d+):(\d{2})$/)
   if (timeMatch) {
     const minutes = parseInt(timeMatch[1], 10)
@@ -927,7 +1004,7 @@ const parseTimeInput = (input) => {
     }
   }
   
-  // Try parsing as plain seconds (number)
+  // Try parsing as plain seconds (number) - supports decimals for milliseconds
   const asNumber = parseFloat(trimmed)
   if (!isNaN(asNumber) && asNumber >= 0) {
     return asNumber
@@ -1021,6 +1098,23 @@ const decrementLoopStart = () => {
   loopStartInput.value = formatTime(loopStart.value)
 }
 
+const incrementLoopStartMs = () => {
+  if (loopStart.value === null || !duration.value) return
+  
+  const increment = 0.1 // 100 milliseconds
+  const newTime = Math.min(loopStart.value + increment, loopEnd.value !== null ? loopEnd.value - 0.001 : duration.value)
+  loopStart.value = Math.max(0, newTime)
+  loopStartInput.value = formatTime(loopStart.value)
+}
+
+const decrementLoopStartMs = () => {
+  if (loopStart.value === null || loopStart.value <= 0) return
+  
+  const decrement = 0.1 // 100 milliseconds
+  loopStart.value = Math.max(0, loopStart.value - decrement)
+  loopStartInput.value = formatTime(loopStart.value)
+}
+
 const incrementLoopEnd = () => {
   if (loopEnd.value === null || !duration.value) return
   
@@ -1038,6 +1132,28 @@ const decrementLoopEnd = () => {
   if (loopEnd.value <= minTime) return
   
   loopEnd.value = Math.max(minTime, loopEnd.value - 1)
+  loopEndInput.value = formatTime(loopEnd.value)
+}
+
+const incrementLoopEndMs = () => {
+  if (loopEnd.value === null || !duration.value) return
+  
+  const increment = 0.1 // 100 milliseconds
+  const maxTime = duration.value
+  if (loopEnd.value >= maxTime - 0.001) return
+  
+  loopEnd.value = Math.min(loopEnd.value + increment, maxTime)
+  loopEndInput.value = formatTime(loopEnd.value)
+}
+
+const decrementLoopEndMs = () => {
+  if (loopEnd.value === null) return
+  
+  const decrement = 0.1 // 100 milliseconds
+  const minTime = loopStart.value !== null ? loopStart.value + 0.001 : 0
+  if (loopEnd.value <= minTime) return
+  
+  loopEnd.value = Math.max(minTime, loopEnd.value - decrement)
   loopEndInput.value = formatTime(loopEnd.value)
 }
 
@@ -1164,7 +1280,7 @@ watch([loopStart, duration], () => {
       loopStartInput.value = ''
     }
   }
-})
+}, { immediate: true })
 
 watch([loopEnd, duration], () => {
   if (!isEditingEnd.value) {
@@ -1174,7 +1290,7 @@ watch([loopEnd, duration], () => {
       loopEndInput.value = ''
     }
   }
-})
+}, { immediate: true })
 
 // Reset player when file changes
 watch(() => props.file, () => {
@@ -1686,9 +1802,10 @@ onMounted(() => {
 .loop-time-inputs {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 25px;
   justify-content: center;
   margin-bottom: 25px;
+  align-items: flex-start;
 }
 
 .time-input-group {
@@ -1696,12 +1813,17 @@ onMounted(() => {
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  min-width: 200px;
+  flex: 1;
 }
 
 .time-input-group label {
   font-weight: 600;
   color: #333;
-  font-size: 0.9em;
+  font-size: 0.8em;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .time-input-wrapper {
@@ -1709,19 +1831,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0;
+  width: 100%;
+  max-width: 195px;
 }
 
 .time-input {
-  padding: 10px 40px 10px 15px;
+  padding: 10px 115px 10px 18px;
   border: 2px solid #667eea;
   border-radius: 8px;
-  font-size: 1em;
-  width: 120px;
+  font-size: 1.1em;
+  width: 100%;
   text-align: center;
   font-weight: 600;
   color: white;
   background: #667eea;
   transition: all 0.3s ease;
+  box-sizing: border-box;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: visible;
+  overflow: visible;
 }
 
 .time-input:focus {
@@ -1738,10 +1867,25 @@ onMounted(() => {
 
 .time-input-buttons {
   position: absolute;
-  right: 5px;
+  right: 4px;
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.time-btn-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.time-btn-group-ms {
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  padding-left: 5px;
+  margin-left: 2px;
 }
 
 .time-btn {
@@ -1921,12 +2065,32 @@ onMounted(() => {
     width: 100%;
   }
 
+  .loop-time-inputs {
+    gap: 20px;
+  }
+
+  .time-input-group {
+    min-width: 100%;
+    width: 100%;
+  }
+
   .time-input-wrapper {
     width: 100%;
+    max-width: 100%;
   }
 
   .time-input {
     width: 100%;
+    min-width: 100%;
+    font-size: 1em;
+  }
+
+  .time-input-group {
+    min-width: 100%;
+  }
+
+  .time-input-group label {
+    font-size: 0.75em;
   }
 }
 </style>
