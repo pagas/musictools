@@ -32,16 +32,18 @@ defineEmits(['setSpeed'])
 
 <style scoped>
 .speed-controls {
+  display: flex;
+  flex-direction: column;
   background: #f8f9ff;
-  padding: 30px;
+  padding: 15px;
   border-radius: 15px;
 }
 
 .speed-controls h3 {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   color: #333;
   text-align: center;
-  font-size: 1.5em;
+  font-size: 1.1em;
 }
 
 .speed-buttons {
@@ -49,16 +51,15 @@ defineEmits(['setSpeed'])
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
-  margin-bottom: 20px;
 }
 
 .speed-btn {
-  padding: 12px 24px;
+  padding: 8px 16px;
   background: white;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 1em;
+  font-size: 0.85em;
   font-weight: 600;
   color: #667eea;
   transition: all 0.3s ease;

@@ -79,35 +79,37 @@
       />
     </div>
 
-    <LoopControls
-      :loopStart="loopStart"
-      :loopEnd="loopEnd"
-      :loopStartInput="loopStartInput"
-      :loopEndInput="loopEndInput"
-      :duration="duration"
-      :isLoopValid="isLoopValid"
-      @setLoopStart="setLoopStart"
-      @setLoopEnd="setLoopEnd"
-      @clearLoop="clearLoop"
-      @loopStartInput="handleLoopStartInput"
-      @loopEndInput="handleLoopEndInput"
-      @applyLoopStartInput="applyLoopStartInput"
-      @applyLoopEndInput="applyLoopEndInput"
-      @incrementLoopStart="incrementLoopStart"
-      @decrementLoopStart="decrementLoopStart"
-      @incrementLoopStartMs="incrementLoopStartMs"
-      @decrementLoopStartMs="decrementLoopStartMs"
-      @incrementLoopEnd="incrementLoopEnd"
-      @decrementLoopEnd="decrementLoopEnd"
-      @incrementLoopEndMs="incrementLoopEndMs"
-      @decrementLoopEndMs="decrementLoopEndMs"
-    />
+    <div class="controls-row">
+      <LoopControls
+        :loopStart="loopStart"
+        :loopEnd="loopEnd"
+        :loopStartInput="loopStartInput"
+        :loopEndInput="loopEndInput"
+        :duration="duration"
+        :isLoopValid="isLoopValid"
+        @setLoopStart="setLoopStart"
+        @setLoopEnd="setLoopEnd"
+        @clearLoop="clearLoop"
+        @loopStartInput="handleLoopStartInput"
+        @loopEndInput="handleLoopEndInput"
+        @applyLoopStartInput="applyLoopStartInput"
+        @applyLoopEndInput="applyLoopEndInput"
+        @incrementLoopStart="incrementLoopStart"
+        @decrementLoopStart="decrementLoopStart"
+        @incrementLoopStartMs="incrementLoopStartMs"
+        @decrementLoopStartMs="decrementLoopStartMs"
+        @incrementLoopEnd="incrementLoopEnd"
+        @decrementLoopEnd="decrementLoopEnd"
+        @incrementLoopEndMs="incrementLoopEndMs"
+        @decrementLoopEndMs="decrementLoopEndMs"
+      />
 
-    <SpeedControls
-      :currentSpeed="currentSpeed"
-      :speedOptions="speedOptions"
-      @setSpeed="setPlaybackSpeed"
-    />
+      <SpeedControls
+        :currentSpeed="currentSpeed"
+        :speedOptions="speedOptions"
+        @setSpeed="setPlaybackSpeed"
+      />
+    </div>
   </div>
 </template>
 
@@ -282,11 +284,19 @@ const handlePause = () => {
 }
 
 const seekToStart = () => {
-  seek(0)
+  // If loop is set, go to loop start, otherwise go to beginning
+  if (loopStart.value !== null && loopEnd.value !== null) {
+    seek(loopStart.value)
+  } else {
+    seek(0)
+  }
 }
 
 const seekToEnd = () => {
-  if (duration.value > 0) {
+  // If loop is set, go to loop end, otherwise go to end of track
+  if (loopStart.value !== null && loopEnd.value !== null) {
+    seek(loopEnd.value)
+  } else if (duration.value > 0) {
     seek(duration.value)
   }
 }
@@ -485,5 +495,17 @@ onMounted(() => {
 
 .seek-end-btn:hover:not(:disabled) {
   box-shadow: 0 5px 15px rgba(255, 107, 107, 0.6);
+}
+
+.controls-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.controls-row > * {
+  flex: 1;
+  min-width: 300px;
 }
 </style>

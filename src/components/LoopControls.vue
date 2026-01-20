@@ -192,17 +192,18 @@ defineEmits([
 
 <style scoped>
 .loop-controls {
+  display: flex;
+  flex-direction: column;
   background: #f8f9ff;
-  padding: 30px;
+  padding: 15px;
   border-radius: 15px;
-  margin-bottom: 30px;
 }
 
 .loop-controls h3 {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   color: #333;
   text-align: center;
-  font-size: 1.5em;
+  font-size: 1.1em;
 }
 
 .loop-buttons {
@@ -214,12 +215,12 @@ defineEmits([
 }
 
 .loop-btn {
-  padding: 12px 24px;
+  padding: 8px 16px;
   background: white;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 1em;
+  font-size: 0.85em;
   font-weight: 600;
   color: #667eea;
   transition: all 0.3s ease;
@@ -253,17 +254,17 @@ defineEmits([
 
 .loop-time-inputs {
   display: flex;
-  gap: 30px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 25px;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
 }
 
 .time-input-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+  gap: 6px;
+  width: 100%;
+  max-width: 250px;
 }
 
 .time-input-group label {
@@ -281,11 +282,11 @@ defineEmits([
 }
 
 .time-input {
-  min-width: 175px;
-  padding: 10px 115px 10px 15px;
+  min-width: 160px;
+  padding: 8px 100px 8px 12px;
   border: 2px solid #e0e0e0;
   border-radius: 6px;
-  font-size: 1.1em;
+  font-size: 0.95em;
   font-weight: 600;
   color: white;
   background: #667eea;
