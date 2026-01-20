@@ -32,15 +32,6 @@
             class="waveform-canvas"
             @click="seekOnCanvas"
           ></canvas>
-          <input
-            type="range"
-            class="progress-bar"
-            :min="0"
-            :max="duration || 100"
-            :value="currentTime"
-            @input="seek"
-            :style="{ pointerEvents: draggingMarker ? 'none' : 'auto' }"
-          />
           <div 
             class="loop-markers" 
             v-if="loopStart !== null || loopEnd !== null"
@@ -501,12 +492,6 @@ const updateProgress = () => {
   }
 }
 
-const seek = (event) => {
-  const seekTime = parseFloat(event.target.value)
-  if (audioPlayer.value) {
-    audioPlayer.value.currentTime = seekTime
-  }
-}
 
 const updateVolume = (event) => {
   const newVolume = parseInt(event.target.value)
@@ -1013,52 +998,6 @@ onMounted(() => {
   font-size: 0.9em;
   color: #666;
   font-weight: 600;
-}
-
-.progress-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 8px;
-  border-radius: 5px;
-  background: transparent;
-  outline: none;
-  -webkit-appearance: none;
-  cursor: pointer;
-  z-index: 5;
-  opacity: 0.7;
-}
-
-.progress-bar::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #667eea;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.progress-bar::-webkit-slider-thumb:hover {
-  background: #764ba2;
-  transform: scale(1.2);
-}
-
-.progress-bar::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #667eea;
-  cursor: pointer;
-  border: none;
-  transition: all 0.3s ease;
-}
-
-.progress-bar::-moz-range-thumb:hover {
-  background: #764ba2;
-  transform: scale(1.2);
 }
 
 .loop-markers {
