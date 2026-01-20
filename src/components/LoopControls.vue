@@ -316,7 +316,6 @@ defineEmits([
 }
 
 .time-input {
-  width: 175px;
   min-width: 175px;
   padding: 10px 115px 10px 15px;
   border: 2px solid #e0e0e0;
