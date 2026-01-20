@@ -1,5 +1,5 @@
 <template>
-  <div class="note-display" v-if="isNoteDetectionActive || detectedNote">
+  <div class="note-display">
     <span class="note-label">Note:</span>
     <span class="note-status" :class="{ active: isNoteDetectionActive, inactive: !isNoteDetectionActive }">
       <span class="status-dot"></span>

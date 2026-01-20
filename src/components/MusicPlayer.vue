@@ -12,17 +12,30 @@
     ></audio>
 
     <div class="player-controls">
-      <PlaybackControls
-        :isPlaying="isPlaying"
-        :currentTime="currentTime"
-        :duration="duration"
-        @togglePlayPause="togglePlayPause"
-      />
-      
+      <div class="volume-play-wrapper">
+        <button class="play-btn" @click="togglePlayPause">
+          <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+          </svg>
+        </button>
+        <VolumeControl
+          :volume="volume"
+          @update:volume="updateVolume"
+        />
+      </div>
+
       <NoteDetector
         :isNoteDetectionActive="isNoteDetectionActive"
         :detectedNote="detectedNote"
         :detectedFrequency="detectedFrequency"
+      />
+
+      <PlaybackControls
+        :currentTime="currentTime"
+        :duration="duration"
       />
       
       <WaveformViewer
@@ -36,11 +49,6 @@
         @update:loopStart="loopStart = $event"
         @update:loopEnd="loopEnd = $event"
         ref="waveformViewerRef"
-      />
-
-      <VolumeControl
-        :volume="volume"
-        @update:volume="updateVolume"
       />
     </div>
 
@@ -338,5 +346,43 @@ onMounted(() => {
   padding: 30px;
   border-radius: 15px;
   margin-bottom: 30px;
+}
+
+.volume-play-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.play-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  flex-shrink: 0;
+}
+
+.play-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
+}
+
+.play-btn:active {
+  transform: scale(0.95);
+}
+
+.play-btn .play-icon,
+.play-btn .pause-icon {
+  width: 24px;
+  height: 24px;
+  color: white;
 }
 </style>
