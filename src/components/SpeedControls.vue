@@ -12,29 +12,11 @@
         {{ speed }}x
       </button>
     </div>
-    <div class="custom-speed">
-      <label for="customSpeed">Custom Speed:</label>
-      <input
-        id="customSpeed"
-        type="number"
-        v-model.number="customSpeedLocal"
-        min="0.1"
-        max="4"
-        step="0.1"
-        @keypress.enter="applyCustomSpeed"
-      />
-      <button class="btn-apply" @click="applyCustomSpeed">Apply</button>
-    </div>
-    <div class="current-speed-display">
-      Current Speed: <span>{{ currentSpeed.toFixed(2) }}x</span>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-
-const props = defineProps({
+defineProps({
   currentSpeed: {
     type: Number,
     required: true
@@ -45,20 +27,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['setSpeed'])
-
-const customSpeedLocal = ref(props.currentSpeed)
-
-watch(() => props.currentSpeed, (newSpeed) => {
-  customSpeedLocal.value = newSpeed
-})
-
-const applyCustomSpeed = () => {
-  const speed = parseFloat(customSpeedLocal.value)
-  if (speed >= 0.1 && speed <= 4) {
-    emit('setSpeed', speed)
-  }
-}
+defineEmits(['setSpeed'])
 </script>
 
 <style scoped>
@@ -106,59 +75,5 @@ const applyCustomSpeed = () => {
   color: white;
   border-color: #667eea;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.custom-speed {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 15px;
-}
-
-.custom-speed label {
-  font-weight: 600;
-  color: #333;
-}
-
-.custom-speed input {
-  padding: 8px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 1em;
-  width: 80px;
-  text-align: center;
-}
-
-.custom-speed input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.btn-apply {
-  padding: 8px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.btn-apply:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-}
-
-.current-speed-display {
-  text-align: center;
-  font-size: 1.1em;
-  font-weight: 600;
-  color: #333;
-}
-
-.current-speed-display span {
-  color: #667eea;
 }
 </style>
