@@ -67,8 +67,6 @@
       <div 
         class="loop-markers" 
         v-if="loopStart !== null || loopEnd !== null"
-        @mousedown.prevent="handleMarkerMouseDown"
-        @touchstart.prevent="handleMarkerTouchStart"
       >
         <div 
           v-if="loopStart !== null"
@@ -535,8 +533,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: auto;
-  cursor: pointer;
+  pointer-events: none; /* Allow clicks to pass through to canvas */
   z-index: 3;
 }
 
@@ -602,7 +599,7 @@ onUnmounted(() => {
   background: rgba(102, 126, 234, 0.15);
   border-radius: 4px;
   z-index: 1;
-  pointer-events: none;
+  pointer-events: none; /* Allow clicks to pass through */
 }
 
 .loop-info {
