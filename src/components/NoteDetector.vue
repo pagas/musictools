@@ -1,17 +1,19 @@
 <template>
   <div class="note-display">
     <span class="note-label">Note:</span>
-    <span class="note-status" :class="{ active: isNoteDetectionActive, inactive: !isNoteDetectionActive }">
-      <span class="status-dot"></span>
-      {{ isNoteDetectionActive ? 'Active' : 'Inactive' }}
+    <span class="previous-note" v-if="previousNote">
+      <span class="previous-label">Previous:</span>
+      <span class="previous-value">{{ previousNote }}</span>
     </span>
     <span class="note-value" v-if="detectedNote">{{ detectedNote }}</span>
-    <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">No note detected</span>
+    <span class="note-placeholder" v-if="isNoteDetectionActive && !detectedNote">—</span>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { ref, watch } from 'vue'
+
+const props = defineProps({
   isNoteDetectionActive: {
     type: Boolean,
     required: true
@@ -23,6 +25,15 @@ defineProps({
   detectedFrequency: {
     type: Number,
     default: 0
+  }
+})
+
+const previousNote = ref('')
+
+// Watch for note changes and store previous note
+watch(() => props.detectedNote, (newNote, oldNote) => {
+  if (oldNote && oldNote !== newNote) {
+    previousNote.value = oldNote
   }
 })
 </script>
@@ -48,56 +59,6 @@ defineProps({
   font-weight: 600;
 }
 
-.note-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85em;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.note-status.active {
-  color: #51cf66;
-  background: rgba(81, 207, 102, 0.15);
-}
-
-.note-status.inactive {
-  color: #999;
-  background: rgba(153, 153, 153, 0.1);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  transition: all 0.3s ease;
-}
-
-.note-status.active .status-dot {
-  background: #51cf66;
-  box-shadow: 0 0 6px rgba(81, 207, 102, 0.6);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.note-status.inactive .status-dot {
-  background: #999;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
-}
-
 .note-value {
   color: #333;
   font-weight: 700;
@@ -107,7 +68,30 @@ defineProps({
 
 .note-placeholder {
   color: #999;
-  font-size: 0.9em;
-  font-style: italic;
+  font-size: 1.1em;
+  font-weight: 500;
+  min-width: 20px;
+}
+
+.previous-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(102, 126, 234, 0.2);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.previous-label {
+  color: #999;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.previous-value {
+  color: #666;
+  font-weight: 600;
+  font-size: 0.95em;
 }
 </style>
