@@ -21,6 +21,28 @@
             <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
           </svg>
         </button>
+        <button 
+          class="seek-btn seek-start-btn" 
+          @click="seekToStart"
+          :disabled="!duration || duration === 0"
+          title="Go to Start"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="11 17 6 12 11 7"></polyline>
+            <polyline points="18 17 13 12 18 7"></polyline>
+          </svg>
+        </button>
+        <button 
+          class="seek-btn seek-end-btn" 
+          @click="seekToEnd"
+          :disabled="!duration || duration === 0"
+          title="Go to End"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="13 17 18 12 13 7"></polyline>
+            <polyline points="6 17 11 12 6 7"></polyline>
+          </svg>
+        </button>
         <VolumeControl
           :volume="volume"
           @update:volume="updateVolume"
@@ -256,6 +278,16 @@ const handlePause = () => {
   handlePauseBase()
 }
 
+const seekToStart = () => {
+  seek(0)
+}
+
+const seekToEnd = () => {
+  if (duration.value > 0) {
+    seek(duration.value)
+  }
+}
+
 const handleEnded = () => {
   // If loop is enabled and valid, restart from loop start
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
@@ -370,5 +402,58 @@ onMounted(() => {
   width: 24px;
   height: 24px;
   color: white;
+}
+
+.seek-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  flex-shrink: 0;
+}
+
+.seek-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
+}
+
+.seek-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.seek-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seek-btn svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.seek-start-btn {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  box-shadow: 0 3px 10px rgba(81, 207, 102, 0.4);
+}
+
+.seek-start-btn:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
+}
+
+.seek-end-btn {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  box-shadow: 0 3px 10px rgba(255, 107, 107, 0.4);
+}
+
+.seek-end-btn:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(255, 107, 107, 0.6);
 }
 </style>

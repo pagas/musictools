@@ -112,6 +112,16 @@ const handlePause = () => {
   handlePauseBase()
 }
 
+const seekToStart = () => {
+  seek(0)
+}
+
+const seekToEnd = () => {
+  if (duration.value > 0) {
+    seek(duration.value)
+  }
+}
+
 // Reset when file changes
 watch(() => props.file, () => {
   // File changed - components will handle their own cleanup
@@ -188,5 +198,58 @@ onMounted(() => {
   width: 24px;
   height: 24px;
   color: white;
+}
+
+.seek-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  flex-shrink: 0;
+}
+
+.seek-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
+}
+
+.seek-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.seek-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seek-btn svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.seek-start-btn {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  box-shadow: 0 3px 10px rgba(81, 207, 102, 0.4);
+}
+
+.seek-start-btn:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
+}
+
+.seek-end-btn {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  box-shadow: 0 3px 10px rgba(255, 107, 107, 0.4);
+}
+
+.seek-end-btn:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(255, 107, 107, 0.6);
 }
 </style>
