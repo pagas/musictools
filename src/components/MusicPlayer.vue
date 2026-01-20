@@ -49,15 +49,15 @@
         />
       </div>
 
-      <PlaybackControls
-        :currentTime="currentTime"
-        :duration="duration"
-      />
-
       <NoteDetector
         :isNoteDetectionActive="isNoteDetectionActive"
         :detectedNote="detectedNote"
         :detectedFrequency="detectedFrequency"
+      />
+
+      <PlaybackControls
+        :currentTime="currentTime"
+        :duration="duration"
       />
       
       <WaveformViewer
