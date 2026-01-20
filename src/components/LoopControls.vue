@@ -12,7 +12,7 @@
     </div>
     <div class="loop-time-inputs">
       <div class="time-input-group">
-        <label for="loopStartInput">Loop Start (MM:SS or MM:SS.ms):</label>
+        <label for="loopStartInput">Loop Start:</label>
         <div class="time-input-wrapper">
           <input
             id="loopStartInput"
@@ -77,7 +77,7 @@
         </div>
       </div>
       <div class="time-input-group">
-        <label for="loopEndInput">Loop End (MM:SS or MM:SS.ms):</label>
+        <label for="loopEndInput">Loop End:</label>
         <div class="time-input-wrapper">
           <input
             id="loopEndInput"
@@ -142,21 +142,6 @@
         </div>
       </div>
     </div>
-    <div class="loop-toggle">
-      <label class="loop-switch">
-        <input 
-          type="checkbox" 
-          :checked="loopEnabled" 
-          :disabled="!isLoopValid"
-          @change="$emit('update:loopEnabled', $event.target.checked)"
-        >
-        <span class="slider"></span>
-        <span class="label-text">Enable Loop</span>
-      </label>
-      <span v-if="!isLoopValid && (loopStart !== null || loopEnd !== null)" class="loop-warning">
-        Both start and end must be set to enable loop
-      </span>
-    </div>
   </div>
 </template>
 
@@ -169,10 +154,6 @@ defineProps({
   loopEnd: {
     type: Number,
     default: null
-  },
-  loopEnabled: {
-    type: Boolean,
-    default: false
   },
   loopStartInput: {
     type: String,
@@ -391,77 +372,5 @@ defineEmits([
 .time-btn-ms svg {
   width: 14px;
   height: 14px;
-}
-
-.loop-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  flex-direction: column;
-}
-
-.loop-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.loop-switch input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
-
-.slider {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
-  background-color: #ccc;
-  border-radius: 24px;
-  transition: 0.4s;
-  margin-right: 10px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  border-radius: 50%;
-  transition: 0.4s;
-}
-
-.loop-switch input:checked + .slider {
-  background-color: #667eea;
-}
-
-.loop-switch input:checked + .slider:before {
-  transform: translateX(26px);
-}
-
-.loop-switch input:disabled + .slider {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.label-text {
-  font-weight: 600;
-  color: #333;
-}
-
-.loop-warning {
-  color: #ff6b6b;
-  font-size: 0.85em;
-  font-weight: 600;
-  text-align: center;
 }
 </style>

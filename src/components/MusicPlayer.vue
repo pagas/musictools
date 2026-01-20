@@ -82,7 +82,6 @@
     <LoopControls
       :loopStart="loopStart"
       :loopEnd="loopEnd"
-      :loopEnabled="loopEnabled"
       :loopStartInput="loopStartInput"
       :loopEndInput="loopEndInput"
       :duration="duration"
@@ -102,7 +101,6 @@
       @decrementLoopEnd="decrementLoopEnd"
       @incrementLoopEndMs="incrementLoopEndMs"
       @decrementLoopEndMs="decrementLoopEndMs"
-      @update:loopEnabled="loopEnabled = $event"
     />
 
     <SpeedControls
