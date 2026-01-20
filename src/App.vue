@@ -1,9 +1,26 @@
 <template>
   <div class="container">
     <header>
-      <h1>🎵 Music Player</h1>
-      <p class="subtitle">Upload and control your music playback speed</p>
+      <h1>🎵 Music Tools</h1>
+      <p class="subtitle">Upload and analyze or slow down your music</p>
     </header>
+
+    <nav v-if="currentFile" class="tabs">
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'slowdowner' }"
+        @click="activeTab = 'slowdowner'"
+      >
+        🎚️ Slow Downer
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'analyzer' }"
+        @click="activeTab = 'analyzer'"
+      >
+        🔍 Music Analyzer
+      </button>
+    </nav>
 
     <main>
       <FileUpload
@@ -17,7 +34,12 @@
       </div>
 
       <MusicPlayer
-        v-if="currentFile"
+        v-if="currentFile && activeTab === 'slowdowner'"
+        :file="currentFile"
+      />
+
+      <MusicAnalyzer
+        v-if="currentFile && activeTab === 'analyzer'"
         :file="currentFile"
       />
     </main>
@@ -28,8 +50,10 @@
 import { ref } from 'vue'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
+import MusicAnalyzer from './components/MusicAnalyzer.vue'
 
 const currentFile = ref(null)
+const activeTab = ref('slowdowner')
 
 const handleFileSelected = (file) => {
   currentFile.value = file
@@ -108,5 +132,38 @@ main {
   background: #764ba2;
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  padding: 0 40px;
+  border-bottom: 2px solid #e0e0e0;
+  background: #f8f9ff;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 15px 30px;
+  font-size: 1em;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+  top: 2px;
+}
+
+.tab-btn:hover {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.tab-btn.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: white;
 }
 </style>

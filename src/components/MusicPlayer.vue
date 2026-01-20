@@ -27,15 +27,15 @@
         />
       </div>
 
+      <PlaybackControls
+        :currentTime="currentTime"
+        :duration="duration"
+      />
+
       <NoteDetector
         :isNoteDetectionActive="isNoteDetectionActive"
         :detectedNote="detectedNote"
         :detectedFrequency="detectedFrequency"
-      />
-
-      <PlaybackControls
-        :currentTime="currentTime"
-        :duration="duration"
       />
       
       <WaveformViewer
@@ -89,8 +89,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAudio } from '../composables/useAudio'
-import { useNoteDetection } from '../composables/useNoteDetection'
 import { useLoop } from '../composables/useLoop'
+import { useNoteDetection } from '../composables/useNoteDetection'
 import PlaybackControls from './PlaybackControls.vue'
 import NoteDetector from './NoteDetector.vue'
 import VolumeControl from './VolumeControl.vue'
@@ -127,19 +127,6 @@ const {
   handlePause: handlePauseBase
 } = useAudio(fileRef)
 
-// Initialize audio context for note detection
-const audioContext = ref(null)
-
-// Use note detection composable
-const {
-  detectedNote,
-  detectedFrequency,
-  isNoteDetectionActive,
-  setupAudioAnalysis,
-  startNoteDetection,
-  stopNoteDetection,
-  cleanup: cleanupNoteDetection
-} = useNoteDetection(audioPlayer, audioContext)
 
 // Use loop composable
 const {
@@ -165,6 +152,20 @@ const {
   incrementLoopEndMs,
   decrementLoopEndMs
 } = useLoop(audioPlayer, computed(() => duration.value))
+
+// Initialize audio context for note detection
+const audioContext = ref(null)
+
+// Use note detection composable
+const {
+  detectedNote,
+  detectedFrequency,
+  isNoteDetectionActive,
+  setupAudioAnalysis,
+  startNoteDetection,
+  stopNoteDetection,
+  cleanup: cleanupNoteDetection
+} = useNoteDetection(audioPlayer, audioContext)
 
 // Speed options
 const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -192,7 +193,7 @@ const initAudioContext = () => {
   }
 }
 
-// Enhanced handlers that integrate note detection
+// Enhanced handlers
 const togglePlayPause = () => {
   togglePlayPauseBase()
   
@@ -249,24 +250,13 @@ const handleTimeUpdate = () => {
 
 const handlePlay = () => {
   handlePlayBase()
-  // Resume audio context if suspended
-  if (audioContext.value && audioContext.value.state === 'suspended') {
-    audioContext.value.resume()
-  }
-  // Start note detection if analyser is set up
-  if (audioContext.value) {
-    startNoteDetection()
-  }
 }
 
 const handlePause = () => {
   handlePauseBase()
-  stopNoteDetection()
 }
 
 const handleEnded = () => {
-  stopNoteDetection()
-  
   // If loop is enabled and valid, restart from loop start
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
     if (audioPlayer.value) {
@@ -276,10 +266,6 @@ const handleEnded = () => {
           audioPlayer.value.play().catch(() => {
             // Ignore play promise errors
           })
-          // Restart note detection after looping
-          if (audioContext.value) {
-            startNoteDetection()
-          }
         }
       })
     }
