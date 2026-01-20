@@ -3,20 +3,6 @@
     <h3>Loop Controls</h3>
     <div class="loop-buttons">
       <button 
-        class="loop-btn" 
-        :class="{ active: loopStart !== null }"
-        @click="$emit('setLoopStart')"
-      >
-        Mark Loop Start
-      </button>
-      <button 
-        class="loop-btn" 
-        :class="{ active: loopEnd !== null }"
-        @click="$emit('setLoopEnd')"
-      >
-        Mark Loop End
-      </button>
-      <button 
         class="loop-btn loop-clear" 
         @click="$emit('clearLoop')"
         v-if="loopStart !== null || loopEnd !== null"
@@ -207,8 +193,6 @@ defineProps({
 })
 
 defineEmits([
-  'setLoopStart',
-  'setLoopEnd',
   'clearLoop',
   'loopStartInput',
   'loopEndInput',
@@ -221,8 +205,7 @@ defineEmits([
   'incrementLoopEnd',
   'decrementLoopEnd',
   'incrementLoopEndMs',
-  'decrementLoopEndMs',
-  'update:loopEnabled'
+  'decrementLoopEndMs'
 ])
 </script>
 

@@ -317,6 +317,19 @@ const handleEnded = () => {
 // Track last loop jump for debouncing
 const lastLoopJump = ref(0)
 
+// Automatically enable loop when both start and end are set
+watch([loopStart, loopEnd], ([newStart, newEnd], [oldStart, oldEnd]) => {
+  if (newStart !== null && newEnd !== null && newStart < newEnd) {
+    const wasEnabled = loopEnabled.value
+    loopEnabled.value = true
+    // If loop range changed and audio player exists, always seek to loop start
+    if (audioPlayer.value && (newStart !== oldStart || newEnd !== oldEnd)) {
+      seek(newStart)
+    }
+  }
+})
+
+
 // Reset when file changes
 watch(() => props.file, () => {
   // Stop note detection
