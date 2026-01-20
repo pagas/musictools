@@ -313,6 +313,7 @@ defineEmits([
   display: flex;
   align-items: center;
   max-width: 195px;
+  width: 100%;
 }
 
 .time-input {
@@ -347,12 +348,15 @@ defineEmits([
   transform: translateY(-50%);
   display: flex;
   flex-direction: row;
+  align-items: center;
   gap: 4px;
 }
 
 .time-btn-group {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
 }
 
@@ -396,14 +400,14 @@ defineEmits([
 }
 
 .time-btn-ms {
-  width: 20px;
-  height: 16px;
+  width: 24px;
+  height: 20px;
   opacity: 0.8;
 }
 
 .time-btn-ms svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 .loop-toggle {
