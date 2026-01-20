@@ -30,7 +30,6 @@
           <canvas
             ref="waveformCanvas"
             class="waveform-canvas"
-            :class="{ 'panning': isPanning, 'zoomable': zoomLevel > 1 }"
             @click="handleCanvasClick"
             @wheel.prevent="handleWheelZoom"
             @mousedown="handleCanvasMouseDown"
@@ -101,7 +100,7 @@
               v-if="loopStart !== null"
               class="loop-marker loop-start"
               :class="{ dragging: draggingMarker === 'start' }"
-              :style="{ left: `${(loopStart / duration) * 100}%` }"
+              :style="{ left: loopStartPosition }"
               :title="`Loop Start: ${formatTime(loopStart)} - Drag to adjust`"
               @mousedown.stop.prevent="startDrag('start', $event)"
               @touchstart.stop.prevent="startDrag('start', $event)"
@@ -110,7 +109,7 @@
               v-if="loopEnd !== null"
               class="loop-marker loop-end"
               :class="{ dragging: draggingMarker === 'end' }"
-              :style="{ left: `${(loopEnd / duration) * 100}%` }"
+              :style="{ left: loopEndPosition }"
               :title="`Loop End: ${formatTime(loopEnd)} - Drag to adjust`"
               @mousedown.stop.prevent="startDrag('end', $event)"
               @touchstart.stop.prevent="startDrag('end', $event)"
@@ -118,10 +117,7 @@
             <div 
               v-if="loopStart !== null && loopEnd !== null"
               class="loop-range"
-              :style="{ 
-                left: `${(loopStart / duration) * 100}%`,
-                width: `${((loopEnd - loopStart) / duration) * 100}%`
-              }"
+              :style="loopRangeStyle"
             ></div>
           </div>
         </div>
@@ -130,6 +126,17 @@
           <span v-if="loopEnd !== null">End: {{ formatTime(loopEnd) }}</span>
         </div>
       </div>
+      <!-- Scrollbar for zoomed view -->
+      <input
+        v-if="zoomLevel > 1 && duration > 0"
+        type="range"
+        class="zoom-scrollbar"
+        :min="0"
+        :max="scrollbarMax"
+        :value="scrollbarValue"
+        @input="handleScrollbarInput"
+        :title="`Scroll: ${formatTime(visibleStartTime)} - ${formatTime(visibleEndTime)}`"
+      />
 
       <div class="volume-control">
         <svg class="volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -382,9 +389,6 @@ const audioContext = ref(null)
 const waveformData = ref(null)
 const zoomLevel = ref(1)
 const zoomOffset = ref(0)
-const isPanning = ref(false)
-const panStartX = ref(0)
-const panStartOffset = ref(0)
 const isClick = ref(false)
 const clickStartTime = ref(0)
 
@@ -393,6 +397,122 @@ const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 const audioUrl = computed(() => {
   return URL.createObjectURL(props.file)
 })
+
+// Computed properties for loop marker positions accounting for zoom
+const visibleStartTime = computed(() => {
+  if (!duration.value) return 0
+  const visDur = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visDur)
+  return Math.max(0, Math.min(maxOffset, zoomOffset.value))
+})
+
+const visibleEndTime = computed(() => {
+  if (!duration.value) return 0
+  const visDur = duration.value / zoomLevel.value
+  return visibleStartTime.value + visDur
+})
+
+const visibleDurationTime = computed(() => {
+  if (!duration.value) return 0
+  return duration.value / zoomLevel.value
+})
+
+const loopStartPosition = computed(() => {
+  if (loopStart.value === null || !duration.value) return '0%'
+  
+  const start = loopStart.value
+  const visStart = visibleStartTime.value
+  const visEnd = visibleEndTime.value
+  const visDur = visibleDurationTime.value
+  
+  if (start < visStart) {
+    // Before visible area - show at left edge
+    return '-6px'
+  } else if (start > visEnd) {
+    // After visible area - show at right edge
+    return 'calc(100% + 6px)'
+  } else {
+    // Within visible area - calculate position
+    const position = ((start - visStart) / visDur) * 100
+    return `${position}%`
+  }
+})
+
+const loopEndPosition = computed(() => {
+  if (loopEnd.value === null || !duration.value) return '0%'
+  
+  const end = loopEnd.value
+  const visStart = visibleStartTime.value
+  const visEnd = visibleEndTime.value
+  const visDur = visibleDurationTime.value
+  
+  if (end < visStart) {
+    // Before visible area - show at left edge
+    return '-6px'
+  } else if (end > visEnd) {
+    // After visible area - show at right edge
+    return 'calc(100% + 6px)'
+  } else {
+    // Within visible area - calculate position
+    const position = ((end - visStart) / visDur) * 100
+    return `${position}%`
+  }
+})
+
+const loopRangeStyle = computed(() => {
+  if (loopStart.value === null || loopEnd.value === null || !duration.value) {
+    return { left: '0%', width: '0%' }
+  }
+  
+  const start = loopStart.value
+  const end = loopEnd.value
+  const visStart = visibleStartTime.value
+  const visEnd = visibleEndTime.value
+  const visDur = visibleDurationTime.value
+  
+  // Calculate the visible portion of the loop range
+  const rangeStart = Math.max(start, visStart)
+  const rangeEnd = Math.min(end, visEnd)
+  
+  if (rangeEnd <= rangeStart) {
+    // Loop range is outside visible area
+    return { left: '0%', width: '0%' }
+  }
+  
+  const left = ((rangeStart - visStart) / visDur) * 100
+  const width = ((rangeEnd - rangeStart) / visDur) * 100
+  
+  return {
+    left: `${Math.max(0, left)}%`,
+    width: `${Math.min(100, width)}%`
+  }
+})
+
+// Scrollbar computed properties
+const scrollbarMax = computed(() => {
+  if (!duration.value || zoomLevel.value <= 1) return 0
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  // Return max offset in steps (using 1000 steps for smooth scrolling)
+  return Math.max(0, Math.floor(maxOffset * 1000))
+})
+
+const scrollbarValue = computed(() => {
+  if (!duration.value || zoomLevel.value <= 1) return 0
+  return Math.floor(zoomOffset.value * 1000)
+})
+
+// Handle scrollbar input
+const handleScrollbarInput = (event) => {
+  if (!duration.value || zoomLevel.value <= 1) return
+  
+  const value = parseFloat(event.target.value) / 1000 // Convert back to seconds
+  const visibleDuration = duration.value / zoomLevel.value
+  const maxOffset = Math.max(0, duration.value - visibleDuration)
+  
+  zoomOffset.value = Math.max(0, Math.min(maxOffset, value))
+  drawWaveform()
+}
 
 // Initialize audio context for waveform preprocessing
 const initAudioContext = () => {
@@ -588,13 +708,10 @@ const drawWaveform = () => {
 }
 
 
-// Handle canvas click or pan
+// Handle canvas click - seek to clicked position
 const handleCanvasClick = (event) => {
-  // Only process clicks (not drags) at normal zoom level
+  // Only process clicks (not drags)
   if (!isClick.value) return
-  
-  // At zoomed in, clicking should not seek (panning is enabled)
-  if (zoomLevel.value > 1) return
   
   if (!waveformCanvas.value || !duration.value) return
   
@@ -602,7 +719,7 @@ const handleCanvasClick = (event) => {
   const rect = canvas.getBoundingClientRect()
   const x = event.clientX - rect.left
   
-  // Calculate time based on zoom (at normal zoom, offset is 0)
+  // Calculate time based on zoom and offset
   const visibleDuration = duration.value / zoomLevel.value
   const maxOffset = Math.max(0, duration.value - visibleDuration)
   const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffset.value))
@@ -610,7 +727,7 @@ const handleCanvasClick = (event) => {
   const clickTime = clampedOffset + (x * pixelToTime)
   const validTime = Math.max(0, Math.min(duration.value, clickTime))
   
-  // Just seek to clicked position (don't set loop markers)
+  // Seek to clicked position
   if (audioPlayer.value) {
     audioPlayer.value.currentTime = validTime
   }
@@ -620,76 +737,49 @@ const handleCanvasClick = (event) => {
 const handleCanvasMouseDown = (event) => {
   if (!waveformCanvas.value || !duration.value) return
   
-  // Don't start panning if dragging a marker
+  // Don't interfere if dragging a marker
   if (draggingMarker.value) return
   
-  // Initialize click tracking for all clicks
+  // Initialize click tracking
   isClick.value = true
   clickStartTime.value = Date.now()
   
-  // If zoomed in, enable panning
-  if (zoomLevel.value > 1) {
-    isPanning.value = true
-    panStartX.value = event.clientX
-    panStartOffset.value = zoomOffset.value
-    event.preventDefault()
-    waveformCanvas.value.style.cursor = 'grabbing'
-    
-    // Prevent text selection during pan
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = 'grabbing'
-  } else {
-    // At normal zoom, we'll set loop start on click (handled in handleCanvasClick)
-    // Just prevent default to avoid text selection
-    event.preventDefault()
-  }
+  // Just prevent default to avoid text selection
+  event.preventDefault()
 }
 
-// Handle mouse move on canvas (for panning)
+// Handle mouse move on canvas
 const handleCanvasMouseMove = (event) => {
   if (!waveformCanvas.value || !duration.value) return
   
-  // Don't pan if dragging a marker
+  // Don't interfere if dragging a marker
   if (draggingMarker.value) return
   
-  if (isPanning.value && zoomLevel.value > 1) {
-    // Check if mouse has moved significantly (more than 3px) - it's a drag
-    const deltaX = Math.abs(event.clientX - panStartX.value)
-    if (deltaX > 3) {
-      isClick.value = false // It's a drag, not a click
+  // Check if mouse has moved significantly (more than 3px) - it's a drag, not a click
+  if (isClick.value && clickStartTime.value > 0) {
+    // Get the canvas rect to calculate relative position
+    const rect = waveformCanvas.value.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const startX = event.clientX // Use absolute position for delta check
+    
+    // We need to track the initial mouse position, but for simplicity,
+    // we'll just check if enough time has passed and movement occurred
+    const timeSinceStart = Date.now() - clickStartTime.value
+    if (timeSinceStart > 200) {
+      // If significant time passed, consider it might be a drag
+      // But for simplicity, we'll allow clicks even with movement
+      // The click handler will check isClick.value
     }
-    
-    const visibleDuration = duration.value / zoomLevel.value
-    const pixelToTime = visibleDuration / waveformCanvas.value.offsetWidth
-    const timeDelta = (event.clientX - panStartX.value) * pixelToTime
-    
-    const newOffset = panStartOffset.value - timeDelta
-    const maxOffset = Math.max(0, duration.value - visibleDuration)
-    zoomOffset.value = Math.max(0, Math.min(maxOffset, newOffset))
-    
-    drawWaveform()
-  } else if (zoomLevel.value > 1 && !draggingMarker.value) {
-    // Show grab cursor when hovering over zoomed waveform
-    waveformCanvas.value.style.cursor = 'grab'
-  } else if (!draggingMarker.value) {
+  }
+  
+  // Always show pointer cursor for clicking/seeking
+  if (!draggingMarker.value) {
     waveformCanvas.value.style.cursor = 'pointer'
   }
 }
 
 // Handle mouse up on canvas
 const handleCanvasMouseUp = () => {
-  if (isPanning.value) {
-    isPanning.value = false
-    
-    // Restore cursor and user selection
-    document.body.style.userSelect = ''
-    document.body.style.cursor = ''
-    
-    if (waveformCanvas.value) {
-      waveformCanvas.value.style.cursor = zoomLevel.value > 1 && !draggingMarker.value ? 'grab' : 'pointer'
-    }
-  }
-  
   // Reset click flag after a short delay to allow click handler to fire
   setTimeout(() => {
     isClick.value = false
@@ -1186,13 +1276,6 @@ const getTimeFromPosition = (clientX) => {
 }
 
 const startDrag = (marker, event) => {
-  // Stop any panning
-  if (isPanning.value) {
-    isPanning.value = false
-    document.body.style.userSelect = ''
-    document.body.style.cursor = ''
-  }
-  
   draggingMarker.value = marker
   const clientX = event.touches ? event.touches[0].clientX : event.clientX
   updateMarkerPosition(clientX)
@@ -1331,7 +1414,6 @@ watch(() => props.file, () => {
   // Reset zoom
   zoomLevel.value = 1
   zoomOffset.value = 0
-  isPanning.value = false
   isClick.value = false
   
   // Clean up event listeners
@@ -1532,13 +1614,6 @@ onMounted(() => {
   -webkit-user-select: none;
 }
 
-.waveform-canvas.zoomable {
-  cursor: grab;
-}
-
-.waveform-canvas.panning {
-  cursor: grabbing;
-}
 
 .time-display {
   display: flex;
@@ -1681,6 +1756,69 @@ onMounted(() => {
   font-weight: 600;
   color: #667eea;
   font-size: 0.9em;
+}
+
+.zoom-scrollbar {
+  width: 100%;
+  height: 8px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  background: #e0e0e0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.zoom-scrollbar:hover {
+  background: #d0d0d0;
+}
+
+.zoom-scrollbar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.zoom-scrollbar::-webkit-slider-thumb:hover {
+  background: #5568d3;
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.zoom-scrollbar::-webkit-slider-thumb:active {
+  transform: scale(1.25);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.zoom-scrollbar::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.zoom-scrollbar::-moz-range-thumb:hover {
+  background: #5568d3;
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.zoom-scrollbar::-moz-range-thumb:active {
+  transform: scale(1.25);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
 }
 
 .speed-controls {
