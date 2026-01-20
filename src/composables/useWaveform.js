@@ -15,7 +15,16 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     if (typeof refOrGetter === 'function') {
       return refOrGetter()
     }
-    return refOrGetter?.value ?? refOrGetter
+    // Handle Vue refs
+    if (refOrGetter && typeof refOrGetter === 'object' && 'value' in refOrGetter) {
+      const val = refOrGetter.value
+      // Handle NaN - return 0 for numeric refs that are NaN
+      if (typeof val === 'number' && isNaN(val)) {
+        return 0
+      }
+      return val
+    }
+    return refOrGetter
   }
 
   // Computed properties for visible time range
@@ -125,7 +134,8 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     const loopStartVal = getValue(loopStart)
     const loopEndVal = getValue(loopEnd)
     
-    if (!waveformCanvas.value || !durationVal) return
+    if (!waveformCanvas.value || !durationVal || durationVal <= 0) return
+    if (!zoomLevelVal || zoomLevelVal <= 0) return
     
     const canvas = waveformCanvas.value
     if (!canvas || canvas.offsetWidth === 0 || canvas.offsetHeight === 0) return
@@ -142,31 +152,39 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     
     const visibleDuration = durationVal / zoomLevelVal
     const maxOffset = Math.max(0, durationVal - visibleDuration)
-    const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
+    // Ensure zoomOffsetVal is a valid number (not NaN)
+    const validZoomOffset = (typeof zoomOffsetVal === 'number' && !isNaN(zoomOffsetVal)) ? zoomOffsetVal : 0
+    const clampedOffset = Math.max(0, Math.min(maxOffset, validZoomOffset))
     const visibleStart = clampedOffset
-    const visibleEnd = clampedOffset + visibleDuration
+    const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
     const timeToPixel = width / visibleDuration
     
     // Draw waveform
     if (waveformData.value && waveformData.value.length > 0) {
       const centerY = height / 2
       const sampleDuration = durationVal / waveformData.value.length
-      const startSample = Math.floor(visibleStart / sampleDuration)
-      const endSample = Math.ceil(visibleEnd / sampleDuration)
+      
+      // Clamp visible range to valid bounds for sample calculation
+      const clampedVisibleStart = Math.max(0, Math.min(durationVal, visibleStart))
+      const clampedVisibleEnd = Math.max(0, Math.min(durationVal, visibleEnd))
+      
+      const startSample = Math.max(0, Math.floor(clampedVisibleStart / sampleDuration))
+      const endSample = Math.min(waveformData.value.length, Math.ceil(clampedVisibleEnd / sampleDuration))
       const samplesToDraw = endSample - startSample
       
-      if (samplesToDraw > 0) {
+      if (samplesToDraw > 0 && startSample >= 0 && endSample <= waveformData.value.length && startSample < endSample) {
         const barWidth = Math.max(1, width / samplesToDraw)
         
         ctx.fillStyle = '#667eea'
         ctx.strokeStyle = '#667eea'
         ctx.lineWidth = 1
         
-        for (let i = startSample; i < endSample && i < waveformData.value.length; i++) {
+        for (let i = startSample; i < endSample; i++) {
           const value = waveformData.value[i]
           if (value > 0) {
             const barHeight = Math.max(1, value * centerY * 0.8)
             const sampleTime = i * sampleDuration
+            // Use visibleStart (not clamped) for x calculation to match the timeToPixel calculation
             const x = (sampleTime - visibleStart) * timeToPixel
             
             if (x >= -barWidth && x <= width + barWidth) {

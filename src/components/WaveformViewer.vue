@@ -110,7 +110,7 @@
       class="zoom-scrollbar"
       :min="0"
       :max="scrollbarMax"
-      :value="scrollbarValue"
+      v-model.number="scrollbarInputValue"
       @input="handleScrollbarInput"
       :title="`Scroll: ${formatTime(visibleStartTime)} - ${formatTime(visibleEndTime)}`"
     />
@@ -222,24 +222,26 @@ const loopStartPosition = computed(() => {
   // Use the exact same calculation as useWaveform.js
   const durationVal = props.duration
   const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = zoomOffset.value
+  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
   const loopStartVal = props.loopStart
+  
+  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) return '0%'
   
   const visibleDuration = durationVal / zoomLevelVal
   const maxOffset = Math.max(0, durationVal - visibleDuration)
   const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
   const visibleStart = clampedOffset
-  const visibleEnd = clampedOffset + visibleDuration
+  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
   
-  // Match the exact logic from useWaveform.js
-  if (loopStartVal < visibleStart) {
-    return '-6px'
-  } else if (loopStartVal > visibleEnd) {
-    return 'calc(100% + 6px)'
-  } else {
+  // Match the exact logic from useWaveform.js (lines 229-235)
+  if (loopStartVal >= visibleStart && loopStartVal <= visibleEnd) {
     // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
     const position = ((loopStartVal - visibleStart) / visibleDuration) * 100
     return `${Math.max(0, Math.min(100, position))}%`
+  } else if (loopStartVal < visibleStart) {
+    return '-6px'
+  } else {
+    return 'calc(100% + 6px)'
   }
 })
 
@@ -249,24 +251,26 @@ const loopEndPosition = computed(() => {
   // Use the exact same calculation as useWaveform.js
   const durationVal = props.duration
   const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = zoomOffset.value
+  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
   const loopEndVal = props.loopEnd
+  
+  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) return '0%'
   
   const visibleDuration = durationVal / zoomLevelVal
   const maxOffset = Math.max(0, durationVal - visibleDuration)
   const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
   const visibleStart = clampedOffset
-  const visibleEnd = clampedOffset + visibleDuration
+  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
   
-  // Match the exact logic from useWaveform.js
-  if (loopEndVal < visibleStart) {
-    return '-6px'
-  } else if (loopEndVal > visibleEnd) {
-    return 'calc(100% + 6px)'
-  } else {
+  // Match the exact logic from useWaveform.js (lines 249-255)
+  if (loopEndVal >= visibleStart && loopEndVal <= visibleEnd) {
     // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
     const position = ((loopEndVal - visibleStart) / visibleDuration) * 100
     return `${Math.max(0, Math.min(100, position))}%`
+  } else if (loopEndVal < visibleStart) {
+    return '-6px'
+  } else {
+    return 'calc(100% + 6px)'
   }
 })
 
@@ -278,31 +282,44 @@ const loopRangeStyle = computed(() => {
   // Use the exact same calculation as useWaveform.js
   const durationVal = props.duration
   const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = zoomOffset.value
+  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
   const loopStartVal = props.loopStart
   const loopEndVal = props.loopEnd
+  
+  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) {
+    return { left: '0%', width: '0%' }
+  }
   
   const visibleDuration = durationVal / zoomLevelVal
   const maxOffset = Math.max(0, durationVal - visibleDuration)
   const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
   const visibleStart = clampedOffset
-  const visibleEnd = clampedOffset + visibleDuration
+  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
   
-  const rangeStart = Math.max(loopStartVal, visibleStart)
-  const rangeEnd = Math.min(loopEndVal, visibleEnd)
+  // Match the exact logic from useWaveform.js (lines 269-270)
+  const startX = Math.max(0, (loopStartVal - visibleStart) / visibleDuration * 100)
+  const endX = Math.min(100, (loopEndVal - visibleStart) / visibleDuration * 100)
   
-  if (rangeEnd <= rangeStart) {
+  if (endX <= startX) {
     return { left: '0%', width: '0%' }
   }
   
-  const left = ((rangeStart - visibleStart) / visibleDuration) * 100
-  const width = ((rangeEnd - rangeStart) / visibleDuration) * 100
-  
   return {
-    left: `${Math.max(0, Math.min(100, left))}%`,
-    width: `${Math.max(0, Math.min(100, width))}%`
+    left: `${startX}%`,
+    width: `${endX - startX}%`
   }
 })
+
+// Local scrollbar value for v-model binding
+const scrollbarInputValue = ref(0)
+const isDraggingScrollbar = ref(false)
+
+// Sync scrollbarInputValue with scrollbarValue when it changes externally (but not during dragging)
+watch(scrollbarValue, (newValue) => {
+  if (!isDraggingScrollbar.value) {
+    scrollbarInputValue.value = newValue
+  }
+}, { immediate: true })
 
 // Zoom functions that also trigger waveform redraw
 const zoomIn = () => zoomInFn(() => drawWaveform())
@@ -310,7 +327,29 @@ const zoomOut = () => zoomOutFn(() => drawWaveform())
 const resetZoom = () => resetZoomFn(() => drawWaveform())
 const zoomToLoop = () => zoomToLoopFn(() => drawWaveform())
 const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, () => drawWaveform())
-const handleScrollbarInput = (event) => handleScrollbarInputFn(event, () => drawWaveform())
+const handleScrollbarInput = (event) => {
+  isDraggingScrollbar.value = true
+  
+  // Use the v-model value directly
+  const rawValue = scrollbarInputValue.value
+  if (isNaN(rawValue)) {
+    isDraggingScrollbar.value = false
+    return
+  }
+  
+  const value = rawValue / 1000
+  const visibleDuration = props.duration / zoomLevel.value
+  const maxOffset = Math.max(0, props.duration - visibleDuration)
+  const newOffset = Math.max(0, Math.min(maxOffset, value))
+  
+  zoomOffset.value = newOffset
+  drawWaveform()
+  
+  // Reset dragging flag after a short delay
+  setTimeout(() => {
+    isDraggingScrollbar.value = false
+  }, 100)
+}
 
 // Canvas click handler - only seek if it was a click, not a drag
 const handleCanvasClick = (event) => {
