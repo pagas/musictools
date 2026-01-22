@@ -166,4 +166,83 @@ main {
   border-bottom-color: #667eea;
   background: white;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .container {
+    border-radius: 0;
+    margin: 0;
+    max-width: 100%;
+  }
+
+  header {
+    padding: 25px 20px;
+  }
+
+  header h1 {
+    font-size: 2em;
+  }
+
+  .subtitle {
+    font-size: 1em;
+  }
+
+  main {
+    padding: 20px;
+  }
+
+  .file-info {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+    padding: 15px;
+  }
+
+  .file-info p {
+    word-break: break-word;
+  }
+
+  .tabs {
+    padding: 0 20px;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    padding: 12px 20px;
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 480px) {
+  header {
+    padding: 20px 15px;
+  }
+
+  header h1 {
+    font-size: 1.5em;
+  }
+
+  .subtitle {
+    font-size: 0.9em;
+  }
+
+  main {
+    padding: 15px;
+  }
+
+  .file-info {
+    padding: 12px;
+  }
+
+  .tabs {
+    padding: 0 15px;
+  }
+
+  .tab-btn {
+    padding: 10px 15px;
+    font-size: 0.85em;
+    flex: 1;
+    min-width: 120px;
+  }
+}
 </style>

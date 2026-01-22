@@ -374,4 +374,92 @@ defineEmits([
   width: 14px;
   height: 14px;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .loop-controls {
+    padding: 12px;
+  }
+
+  .loop-controls h3 {
+    font-size: 1em;
+  }
+
+  .loop-buttons {
+    margin-bottom: 15px;
+  }
+
+  .loop-btn {
+    padding: 6px 12px;
+    font-size: 0.8em;
+  }
+
+  .time-input-group {
+    max-width: 100%;
+  }
+
+  .time-input-wrapper {
+    max-width: 100%;
+  }
+
+  .time-input {
+    min-width: 140px;
+    padding: 6px 90px 6px 10px;
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 480px) {
+  .loop-controls {
+    padding: 10px;
+  }
+
+  .loop-controls h3 {
+    font-size: 0.95em;
+    margin-bottom: 10px;
+  }
+
+  .loop-buttons {
+    margin-bottom: 12px;
+  }
+
+  .loop-btn {
+    padding: 6px 10px;
+    font-size: 0.75em;
+  }
+
+  .time-input-group label {
+    font-size: 0.85em;
+  }
+
+  .time-input {
+    min-width: 120px;
+    padding: 6px 80px 6px 8px;
+    font-size: 0.85em;
+  }
+
+  .time-input-buttons {
+    right: 2px;
+  }
+
+  .time-btn {
+    width: 22px;
+    height: 18px;
+  }
+
+  .time-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .time-btn-ms {
+    width: 22px;
+    height: 18px;
+  }
+
+  .time-btn-ms svg {
+    width: 12px;
+    height: 12px;
+  }
+}
 </style>

@@ -89,4 +89,25 @@ defineEmits(['update:volume'])
   color: #667eea;
   font-size: 0.9em;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 480px) {
+  .volume-control {
+    gap: 10px;
+  }
+
+  .volume-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .volume-slider {
+    width: 100px;
+  }
+
+  .volume-control span {
+    min-width: 40px;
+    font-size: 0.85em;
+  }
+}
 </style>

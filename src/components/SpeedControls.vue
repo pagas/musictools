@@ -77,4 +77,27 @@ defineEmits(['setSpeed'])
   border-color: #667eea;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
+
+/* Mobile responsive styles */
+@media (max-width: 480px) {
+  .speed-controls {
+    padding: 12px;
+  }
+
+  .speed-controls h3 {
+    font-size: 1em;
+    margin-bottom: 10px;
+  }
+
+  .speed-buttons {
+    gap: 8px;
+  }
+
+  .speed-btn {
+    padding: 6px 12px;
+    font-size: 0.8em;
+    flex: 1;
+    min-width: calc(20% - 6px);
+  }
+}
 </style>

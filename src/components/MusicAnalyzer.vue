@@ -167,6 +167,37 @@ onMounted(() => {
   justify-content: center;
   gap: 20px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .volume-play-wrapper {
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .volume-play-wrapper {
+    gap: 10px;
+  }
+
+  .play-btn,
+  .seek-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .play-btn .play-icon,
+  .play-btn .pause-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .seek-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .play-btn {
