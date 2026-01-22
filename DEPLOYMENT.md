@@ -113,3 +113,9 @@
 - ✅ Preview deployments for pull requests
 
 Just push to GitHub and connect to Vercel - that's it!
+
+## Important Notes
+
+- **This project uses pnpm**: Make sure `pnpm-lock.yaml` is committed to Git for consistent deployments.
+- **Vercel configuration**: The `vercel.json` file is configured to use pnpm - no changes needed!
+- If you need to regenerate the lock file, run `pnpm install` locally.
