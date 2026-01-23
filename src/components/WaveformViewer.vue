@@ -399,7 +399,17 @@ const handleCanvasMouseDownSelection = (event) => {
   const initialTime = Date.now()
   
   const checkDrag = (moveEvent) => {
-    const moveClientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX
+    if (!moveEvent) return
+    
+    let moveClientX
+    if (moveEvent.touches && moveEvent.touches.length > 0) {
+      moveClientX = moveEvent.touches[0].clientX
+    } else if (moveEvent.clientX !== undefined) {
+      moveClientX = moveEvent.clientX
+    } else {
+      return // No valid clientX found
+    }
+    
     const moveX = moveClientX - rect.left
     const moveDistance = Math.abs(moveX - initialX)
     const timeElapsed = Date.now() - initialTime
@@ -444,9 +454,17 @@ const handleCanvasMouseDownSelection = (event) => {
 
 // Handle selection drag
 const handleSelectionDrag = (event) => {
-  if (!progressWrapper.value) return
+  if (!progressWrapper.value || !event) return
   
-  const clientX = event.touches ? event.touches[0].clientX : event.clientX
+  let clientX
+  if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX
+  } else if (event.clientX !== undefined) {
+    clientX = event.clientX
+  } else {
+    return // No valid clientX found
+  }
+  
   const rect = progressWrapper.value.getBoundingClientRect()
   dragCurrentX.value = Math.max(0, Math.min(rect.width, clientX - rect.left))
   
@@ -457,12 +475,23 @@ const handleSelectionDrag = (event) => {
 
 // Stop selection drag and set loop markers
 const stopSelectionDrag = (event) => {
-  if (!isDraggingSelection.value || !progressWrapper.value || !props.duration) {
+  if (!isDraggingSelection.value || !progressWrapper.value || !props.duration || !event) {
     cleanupSelectionDrag()
     return
   }
   
-  const clientX = event.touches ? event.touches[0].clientX : event.clientX
+  let clientX
+  if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX
+  } else if (event.changedTouches && event.changedTouches.length > 0) {
+    clientX = event.changedTouches[0].clientX
+  } else if (event.clientX !== undefined) {
+    clientX = event.clientX
+  } else {
+    cleanupSelectionDrag()
+    return // No valid clientX found
+  }
+  
   const endTime = getTimeFromPositionLocal(clientX)
   
   if (dragStartTime.value !== null && endTime !== null) {
@@ -572,7 +601,7 @@ const handleMarkerMouseDown = (event) => {
 }
 
 const handleMarkerTouchStart = (event) => {
-  if (!draggingMarker.value && event.target === progressWrapper.value && event.touches.length > 0) {
+  if (!draggingMarker.value && event && event.target === progressWrapper.value && event.touches && event.touches.length > 0) {
     const time = getTimeFromPositionLocal(event.touches[0].clientX)
     if (time !== null) {
       if (props.loopStart !== null && props.loopEnd !== null) {
@@ -738,6 +767,7 @@ onUnmounted(() => {
   background: #f0f2ff;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
 .loop-markers {

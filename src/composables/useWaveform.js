@@ -283,11 +283,22 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     const zoomOffsetVal = getValue(zoomOffset)
     const audioPlayerEl = getValue(audioPlayer)
     
-    if (!waveformCanvas.value || !durationVal || !audioPlayerEl) return
+    if (!waveformCanvas.value || !durationVal || !audioPlayerEl || !event) return
     
     const canvas = waveformCanvas.value
     const rect = canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
+    // Handle both mouse and touch events
+    let clientX
+    if (event.touches && event.touches.length > 0) {
+      clientX = event.touches[0].clientX
+    } else if (event.changedTouches && event.changedTouches.length > 0) {
+      clientX = event.changedTouches[0].clientX
+    } else if (event.clientX !== undefined) {
+      clientX = event.clientX
+    } else {
+      return // No valid clientX found
+    }
+    const x = clientX - rect.left
     
     const visibleDuration = durationVal / zoomLevelVal
     const maxOffset = Math.max(0, durationVal - visibleDuration)
