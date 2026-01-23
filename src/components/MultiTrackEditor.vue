@@ -60,6 +60,16 @@
       </div>
     </div>
 
+    <!-- Hidden file input - always available for "Add Files" button -->
+    <input
+      ref="fileInput"
+      type="file"
+      accept="audio/*"
+      multiple
+      style="display: none"
+      @change="handleFileSelect"
+    />
+
     <div class="tracks-container" ref="tracksContainerRef">
       <Track
         v-for="(track, index) in tracks"
@@ -90,14 +100,6 @@
         @dragleave.prevent="isDragging = false"
         @drop.prevent="handleDrop"
       >
-        <input
-          ref="fileInput"
-          type="file"
-          accept="audio/*"
-          multiple
-          style="display: none"
-          @change="handleFileSelect"
-        />
         <div class="upload-content">
           <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
