@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { formatTime } from '../utils/timeFormat'
 import { useZoom } from '../composables/useZoom'
 import { useWaveform } from '../composables/useWaveform'
@@ -137,7 +137,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['seek', 'update:loopStart', 'update:loopEnd'])
+const emit = defineEmits(['update:loopStart', 'update:loopEnd'])
 
 const progressWrapper = ref(null)
 const draggingMarker = ref(null)
@@ -170,9 +170,6 @@ const {
   preprocessWaveform,
   drawWaveform,
   handleCanvasClick: handleCanvasClickBase,
-  handleCanvasMouseDown: handleCanvasMouseDownBase,
-  handleCanvasMouseMove: handleCanvasMouseMoveBase,
-  handleCanvasMouseUp: handleCanvasMouseUpBase,
   getTimeFromPosition,
   getLoopMarkerPosition,
   getLoopRangeStyle,
@@ -262,19 +259,13 @@ const handleScrollbarInput = () => {
 }
 
 // Wrapper for canvas mouse up to avoid interfering with drag selection
-const handleCanvasMouseUpWrapper = (event) => {
-  // Don't interfere if we're in the middle of a drag selection
-  if (!isDraggingSelection.value) {
-    handleCanvasMouseUpBase(event)
-  }
+const handleCanvasMouseUpWrapper = () => {
+  // Mouse up handled by drag selection logic
 }
 
 // Wrapper for canvas mouse move to avoid interfering with drag selection
-const handleCanvasMouseMoveWrapper = (event) => {
-  // Don't interfere if we're in the middle of a drag selection
-  if (!isDraggingSelection.value) {
-    handleCanvasMouseMoveBase(event)
-  }
+const handleCanvasMouseMoveWrapper = () => {
+  // Mouse move handled by drag selection logic
 }
 
 // Handle canvas mouse down - start drag selection if not clicking on marker

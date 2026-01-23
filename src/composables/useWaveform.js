@@ -308,25 +308,6 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     audioPlayerEl.currentTime = validTime
   }
 
-  // Handle mouse down on canvas
-  const handleCanvasMouseDown = (event) => {
-    const durationVal = getValue(duration)
-    if (!waveformCanvas.value || !durationVal) return
-    event.preventDefault()
-  }
-
-  // Handle mouse move on canvas
-  const handleCanvasMouseMove = () => {
-    if (waveformCanvas.value) {
-      waveformCanvas.value.style.cursor = 'pointer'
-    }
-  }
-
-  // Handle mouse up on canvas
-  const handleCanvasMouseUp = () => {
-    // Mouse up handled by component-level logic
-  }
-
   // Get time from position (for loop markers)
   // Note: progressWrapper should be passed from component
   const getTimeFromPosition = (clientX, progressWrapperRef) => {
@@ -450,9 +431,6 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     preprocessWaveform,
     drawWaveform,
     handleCanvasClick,
-    handleCanvasMouseDown,
-    handleCanvasMouseMove,
-    handleCanvasMouseUp,
     getTimeFromPosition,
     getLoopMarkerPosition,
     getLoopRangeStyle,

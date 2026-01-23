@@ -44,7 +44,6 @@
         :currentTime="currentTime"
         :loopStart="null"
         :loopEnd="null"
-        @seek="seek"
         ref="waveformViewerRef"
       />
     </div>

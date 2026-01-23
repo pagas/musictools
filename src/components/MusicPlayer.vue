@@ -40,7 +40,7 @@
       <PlaybackControls :currentTime="currentTime" :duration="duration" />
 
       <WaveformViewer :file="file" :audioPlayer="audioPlayer" :duration="duration" :currentTime="currentTime"
-        :loopStart="loopStart" :loopEnd="loopEnd" @seek="seek" @update:loopStart="loopStart = $event"
+        :loopStart="loopStart" :loopEnd="loopEnd" @update:loopStart="loopStart = $event"
         @update:loopEnd="loopEnd = $event" ref="waveformViewerRef" />
 
       <div class="controls-section">
