@@ -278,14 +278,40 @@ const handleLibraryDragStart = (event, file) => {
   }))
 }
 
-const handleDropBlock = ({ fileId, file, duration, trackIndex }) => {
+const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null }) => {
   const track = tracks.value[trackIndex]
   if (!track) return
 
-  // Check if block already exists
+  // Check if this is a block being moved from another track
+  if (sourceTrackIndex !== null && sourceTrackIndex !== trackIndex) {
+    // Find the block in the source track
+    const sourceTrack = tracks.value[sourceTrackIndex]
+    if (!sourceTrack) return
+    
+    const existingBlock = blocks.value.find(b => b.fileId === fileId && b.trackId === sourceTrack.id)
+    if (existingBlock) {
+      // Remove from source track
+      blocks.value = blocks.value.filter(b => !(b.fileId === fileId && b.trackId === sourceTrack.id))
+      
+      // Add to new track with non-overlapping position
+      const startTime = findNonOverlappingPosition(track.id, dropTime, duration)
+      blocks.value.push({
+        fileId: existingBlock.fileId,
+        trackId: track.id,
+        startTime,
+        file: existingBlock.file,
+        duration: existingBlock.duration
+      })
+      return
+    }
+  }
+
+  // Check if block already exists on this track
   const existingBlock = blocks.value.find(b => b.fileId === fileId && b.trackId === track.id)
   if (existingBlock) {
-    // Move existing block
+    // Move existing block - validate position
+    const newStartTime = findNonOverlappingPosition(track.id, dropTime, duration, existingBlock.fileId)
+    existingBlock.startTime = newStartTime
     return
   }
 
@@ -293,13 +319,85 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex }) => {
   const uploadedFile = uploadedFiles.value.find(f => f.id === fileId)
   if (!uploadedFile) return
 
+  // Find a non-overlapping position for the new block
+  const startTime = findNonOverlappingPosition(track.id, dropTime, uploadedFile.duration)
+
   blocks.value.push({
     fileId,
     trackId: track.id,
-    startTime: 0,
+    startTime,
     file: uploadedFile.file,
     duration: uploadedFile.duration
   })
+}
+
+// Helper function to find a non-overlapping position
+const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, excludeFileId = null) => {
+  // Get all blocks on this track (excluding the one being moved if applicable)
+  const trackBlocks = blocks.value.filter(
+    b => b.trackId === trackId && b.fileId !== excludeFileId
+  )
+  
+  if (trackBlocks.length === 0) {
+    return Math.max(0, preferredTime)
+  }
+
+  // Sort blocks by start time
+  const sortedBlocks = [...trackBlocks].sort((a, b) => a.startTime - b.startTime)
+  
+  const blockEndTime = preferredTime + blockDuration
+  
+  // Check if preferred position overlaps with any block
+  const overlappingBlock = sortedBlocks.find(block => {
+    const blockStart = block.startTime
+    const blockEnd = block.startTime + block.duration
+    return (preferredTime < blockEnd && blockEndTime > blockStart)
+  })
+  
+  if (!overlappingBlock) {
+    // No overlap, use preferred position
+    return Math.max(0, preferredTime)
+  }
+  
+  // Find the best position: either before or after the overlapping block
+  const overlapStart = overlappingBlock.startTime
+  const overlapEnd = overlappingBlock.startTime + overlappingBlock.duration
+  
+  // Check if we can place it before (to the left)
+  const beforePosition = overlapStart - blockDuration
+  if (beforePosition >= 0) {
+    // Check if this position doesn't overlap with previous blocks
+    const wouldOverlapBefore = sortedBlocks.some(block => {
+      if (block.startTime >= overlapStart) return false
+      const blockEnd = block.startTime + block.duration
+      return (beforePosition < blockEnd && beforePosition + blockDuration > block.startTime)
+    })
+    
+    if (!wouldOverlapBefore) {
+      return beforePosition
+    }
+  }
+  
+  // Place it after (to the right) of the overlapping block
+  const afterPosition = overlapEnd
+  
+  // Check if this position doesn't overlap with subsequent blocks
+  let finalPosition = afterPosition
+  for (const block of sortedBlocks) {
+    if (block.startTime < afterPosition) continue
+    
+    const blockStart = block.startTime
+    const blockEnd = block.startTime + block.duration
+    
+    if (afterPosition < blockEnd && afterPosition + blockDuration > blockStart) {
+      // Would overlap, move to after this block
+      finalPosition = blockEnd
+    } else {
+      break
+    }
+  }
+  
+  return finalPosition
 }
 
 const handleBlockDragStart = ({ fileId }) => {
@@ -309,7 +407,14 @@ const handleBlockDragStart = ({ fileId }) => {
 const handleBlockDragMove = ({ fileId, newStartTime }) => {
   const block = blocks.value.find(b => b.fileId === fileId)
   if (block) {
-    block.startTime = Math.max(0, newStartTime)
+    // Find non-overlapping position for the dragged block
+    const validStartTime = findNonOverlappingPosition(
+      block.trackId,
+      newStartTime,
+      block.duration,
+      fileId // Exclude the block being dragged
+    )
+    block.startTime = Math.max(0, validStartTime)
   }
 }
 

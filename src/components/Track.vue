@@ -112,10 +112,33 @@ const handleDrop = (event) => {
   if (data) {
     try {
       const blockData = JSON.parse(data)
-      emit('drop-block', {
-        ...blockData,
-        trackIndex: props.trackIndex
-      })
+      
+      // Calculate drop position based on mouse position
+      const trackContent = trackContentRef.value
+      let dropTime = 0
+      if (trackContent) {
+        const rect = trackContent.getBoundingClientRect()
+        const x = event.clientX - rect.left
+        dropTime = Math.max(0, x / props.pixelsPerSecond)
+      }
+      
+      // Check if this is a block being moved from another track
+      if (blockData.type === 'block') {
+        emit('drop-block', {
+          fileId: blockData.fileId,
+          duration: blockData.duration,
+          trackIndex: props.trackIndex,
+          dropTime,
+          sourceTrackIndex: blockData.trackIndex
+        })
+      } else {
+        // New block from library
+        emit('drop-block', {
+          ...blockData,
+          trackIndex: props.trackIndex,
+          dropTime
+        })
+      }
     } catch (e) {
       console.error('Error parsing drop data:', e)
     }

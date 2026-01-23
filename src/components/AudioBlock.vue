@@ -3,8 +3,11 @@
     class="audio-block"
     :class="{ dragging: isDragging, 'block-playing': isPlaying }"
     :style="blockStyle"
+    draggable="true"
     @mousedown="handleMouseDown"
     @touchstart="handleMouseDown"
+    @dragstart="handleDragStart"
+    @dragend="handleDragEnd"
     :title="`${file.name} (${formatDuration(duration)})`"
   >
     <div class="block-content">
@@ -61,6 +64,7 @@ const emit = defineEmits(['drag-start', 'drag-move', 'drag-end', 'delete', 'upda
 const isDragging = ref(false)
 const dragStartX = ref(0)
 const dragStartTime = ref(0)
+const isHtml5Dragging = ref(false)
 
 const blockStyle = computed(() => {
   const width = props.duration * props.pixelsPerSecond
@@ -76,6 +80,9 @@ const formatDuration = (seconds) => {
 }
 
 const handleMouseDown = (event) => {
+  // Don't start mouse-based dragging if HTML5 drag is active
+  if (isHtml5Dragging.value) return
+  
   isDragging.value = true
   dragStartX.value = event.clientX || event.touches[0].clientX
   dragStartTime.value = props.startTime
@@ -87,7 +94,7 @@ const handleMouseDown = (event) => {
   })
 
   const handleMouseMove = (moveEvent) => {
-    if (!isDragging.value) return
+    if (!isDragging.value || isHtml5Dragging.value) return
     
     const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX)
     if (currentX === undefined) return
@@ -120,6 +127,26 @@ const handleMouseDown = (event) => {
   document.addEventListener('mouseup', handleMouseUp)
   document.addEventListener('touchmove', handleMouseMove)
   document.addEventListener('touchend', handleMouseUp)
+}
+
+const handleDragStart = (event) => {
+  // Mark that HTML5 drag is starting
+  isHtml5Dragging.value = true
+  
+  // Set data for HTML5 drag and drop (for cross-track dragging)
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('application/json', JSON.stringify({
+    type: 'block',
+    fileId: props.fileId,
+    trackIndex: props.trackIndex,
+    startTime: props.startTime,
+    duration: props.duration
+  }))
+}
+
+const handleDragEnd = () => {
+  // Reset flag when drag ends
+  isHtml5Dragging.value = false
 }
 
 const handleDelete = () => {
