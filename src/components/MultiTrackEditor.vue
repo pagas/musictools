@@ -16,6 +16,12 @@
             <polyline points="18 17 13 12 18 7"></polyline>
           </svg>
         </button>
+        <button class="repeat-btn" :class="{ active: isRepeating }" @click="toggleRepeat" 
+          :disabled="tracks.length === 0 || blocks.length === 0" title="Repeat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+          </svg>
+        </button>
         <div class="time-display">{{ formatTime(currentTime) }}</div>
       </div>
       <div class="header-actions">
@@ -209,6 +215,7 @@ const currentTime = ref(0)
 const playbackStartTime = ref(0)
 const animationFrameId = ref(null)
 const playingBlocks = ref(new Set())
+const isRepeating = ref(false)
 
 // Multi-track audio
 const {
@@ -1025,7 +1032,20 @@ const play = async () => {
         : 0
 
       if (currentTime.value >= maxEndTime) {
-        stop()
+        if (isRepeating.value) {
+          // Restart from beginning
+          pause()
+          currentTime.value = 0
+          playbackStartTime.value = 0
+          // Restart playback after a brief delay
+          setTimeout(() => {
+            if (isRepeating.value) {
+              play()
+            }
+          }, 50)
+        } else {
+          stop()
+        }
       } else {
         animationFrameId.value = requestAnimationFrame(updateTime)
       }
@@ -1059,6 +1079,10 @@ const goToStart = () => {
   currentTime.value = 0
   playbackStartTime.value = 0
   stopAll()
+}
+
+const toggleRepeat = () => {
+  isRepeating.value = !isRepeating.value
 }
 
 // Zoom functionality
@@ -1181,7 +1205,8 @@ watch(uploadedFiles, (newFiles) => {
 }
 
 .play-btn,
-.stop-btn {
+.stop-btn,
+.repeat-btn {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -1216,8 +1241,28 @@ watch(uploadedFiles, (newFiles) => {
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
 }
 
+.repeat-btn.active {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  box-shadow: 0 3px 10px rgba(81, 207, 102, 0.4);
+}
+
+.repeat-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
+}
+
+.repeat-btn.active:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
+}
+
+.repeat-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .play-btn svg,
-.stop-btn svg {
+.stop-btn svg,
+.repeat-btn svg {
   width: 24px;
   height: 24px;
 }
@@ -1450,7 +1495,8 @@ watch(uploadedFiles, (newFiles) => {
   }
 
   .play-btn,
-  .stop-btn {
+  .stop-btn,
+  .repeat-btn {
     width: 52px;
     height: 52px;
     min-width: 52px;
@@ -1458,7 +1504,8 @@ watch(uploadedFiles, (newFiles) => {
   }
 
   .play-btn svg,
-  .stop-btn svg {
+  .stop-btn svg,
+  .repeat-btn svg {
     width: 26px;
     height: 26px;
   }
