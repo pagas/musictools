@@ -2,33 +2,28 @@
   <div class="multi-track-editor">
     <div class="editor-header">
       <div class="header-controls">
-        <button 
-          class="play-btn"
-          @click="togglePlayPause"
-          :disabled="tracks.length === 0 || blocks.length === 0"
-        >
+        <button class="play-btn" @click="togglePlayPause" :disabled="tracks.length === 0 || blocks.length === 0">
           <svg v-if="!isPlaying" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
+            <path d="M8 5v14l11-7z" />
           </svg>
           <svg v-else viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
           </svg>
         </button>
         <button class="stop-btn" @click="stop" :disabled="!isPlaying">
           <svg viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12"/>
+            <rect x="6" y="6" width="12" height="12" />
           </svg>
         </button>
         <div class="time-display">{{ formatTime(currentTime) }}</div>
       </div>
       <div class="header-actions">
-        <button class="btn-add-track" @click="addTrack">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Add Track
-        </button>
+        <div class="master-volume-control">
+          <label class="master-volume-label">Master Volume</label>
+          <input type="range" class="master-volume-slider" min="0" max="100" :value="masterVolume"
+            @input="handleMasterVolumeChange" title="Master Volume" />
+          <span class="master-volume-value">{{ masterVolume }}%</span>
+        </div>
       </div>
     </div>
 
@@ -44,14 +39,8 @@
         </button>
       </div>
       <div class="library-grid" v-if="uploadedFiles.length > 0">
-        <div
-          v-for="file in uploadedFiles"
-          :key="file.id"
-          class="library-item"
-          :style="{ backgroundColor: file.color }"
-          draggable="true"
-          @dragstart="handleLibraryDragStart($event, file)"
-        >
+        <div v-for="file in uploadedFiles" :key="file.id" class="library-item" :style="{ backgroundColor: file.color }"
+          draggable="true" @dragstart="handleLibraryDragStart($event, file)">
           <div class="library-item-icon">🎵</div>
           <div class="library-item-info">
             <div class="library-item-name">{{ getSummarizedName(file.file?.name || 'Unknown file') }}</div>
@@ -65,40 +54,30 @@
     </div>
 
     <!-- Hidden file input - always available for "Add Files" button -->
-    <input
-      ref="fileInput"
-      type="file"
-      accept="audio/*"
-      multiple
-      style="display: none"
-      @change="handleFileSelect"
-    />
+    <input ref="fileInput" type="file" accept="audio/*" multiple style="display: none" @change="handleFileSelect" />
 
-    <div 
-      class="tracks-container" 
-      ref="tracksContainerRef"
-      @dragover.prevent="isDragging = true"
-      @dragleave.prevent="isDragging = false"
-      @drop.prevent="handleDrop"
-    >
-      <Track
-        v-for="(track, index) in tracks"
-        :key="track.id"
-        :trackIndex="index"
-        :name="track.name"
-        :blocks="getBlocksForTrack(track.id)"
-        :pixelsPerSecond="pixelsPerSecond"
-        :playingBlocks="playingBlocks"
-        @drop-block="handleDropBlock"
-        @update-name="handleTrackNameUpdate"
-        @delete="handleTrackDelete"
-        @block-drag-start="handleBlockDragStart"
-        @block-drag-move="handleBlockDragMove"
-        @block-drag-end="handleBlockDragEnd"
-        @block-delete="handleBlockDelete"
-        @volume-change="handleVolumeChange"
-        @mute-toggle="handleMuteToggle"
-      />
+
+    <div class="track-actions">
+      <button class="btn-add-track" @click="addTrack">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add Track
+      </button>
+    </div>
+
+    <div class="tracks-section">
+
+      <div class="tracks-container" ref="tracksContainerRef" @dragover.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
+        <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
+          :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
+          @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
+          @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
+          @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
+          @mute-toggle="handleMuteToggle" />
+      </div>
     </div>
   </div>
 </template>
@@ -133,8 +112,12 @@ const {
   stopBlock,
   stopAll,
   setVolume,
+  setMasterVolume,
   cleanup
 } = useMultiTrack()
+
+// Master volume
+const masterVolume = ref(100)
 
 // Generate unique IDs
 let trackIdCounter = 0
@@ -173,6 +156,8 @@ onMounted(() => {
     addTrack()
     addTrack()
   }
+  // Initialize master volume
+  setMasterVolume(masterVolume.value / 100)
 })
 
 // Get blocks for a specific track
@@ -186,7 +171,7 @@ const triggerFileInput = () => {
 }
 
 const handleFileSelect = async (event) => {
-  const files = Array.from(event.target.files).filter(file => 
+  const files = Array.from(event.target.files).filter(file =>
     file.type.startsWith('audio/')
   )
   if (files.length === 0) {
@@ -200,7 +185,7 @@ const handleFileSelect = async (event) => {
 
 const handleDrop = async (event) => {
   isDragging.value = false
-  const files = Array.from(event.dataTransfer.files).filter(file => 
+  const files = Array.from(event.dataTransfer.files).filter(file =>
     file.type.startsWith('audio/')
   )
   await processFiles(files)
@@ -208,14 +193,14 @@ const handleDrop = async (event) => {
 
 const processFiles = async (files) => {
   if (files.length === 0) return
-  
+
   // Filter for audio files only
   const audioFiles = files.filter(file => file.type.startsWith('audio/'))
   if (audioFiles.length === 0) {
     alert('No valid audio files found. Please select audio files (MP3, WAV, OGG, M4A, etc.)')
     return
   }
-  
+
   // Process files in parallel for better performance
   const filePromises = audioFiles.map(async (file) => {
     try {
@@ -224,7 +209,7 @@ const processFiles = async (files) => {
         const timeout = setTimeout(() => {
           reject(new Error('Timeout loading audio metadata'))
         }, 10000) // 10 second timeout
-        
+
         audio.addEventListener('loadedmetadata', () => {
           clearTimeout(timeout)
           const fileId = generateFileId()
@@ -234,12 +219,12 @@ const processFiles = async (files) => {
             duration: audio.duration || 0,
             color: generateRandomColor()
           })
-          
+
           // Load into audio buffer
           loadAudioFile(file, fileId).catch(err => {
             console.error(`Error loading audio buffer for ${file.name}:`, err)
           })
-          
+
           audio.removeEventListener('loadedmetadata', resolve)
           audio.removeEventListener('error', reject)
           resolve()
@@ -254,7 +239,7 @@ const processFiles = async (files) => {
       alert(`Error loading ${file.name}: ${error.message || 'Unknown error'}`)
     }
   })
-  
+
   await Promise.allSettled(filePromises)
 }
 
@@ -303,12 +288,12 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sou
     // Find the block in the source track
     const sourceTrack = tracks.value[sourceTrackIndex]
     if (!sourceTrack) return
-    
+
     const existingBlock = blocks.value.find(b => b.fileId === fileId && b.trackId === sourceTrack.id)
     if (existingBlock) {
       // Remove from source track
       blocks.value = blocks.value.filter(b => !(b.fileId === fileId && b.trackId === sourceTrack.id))
-      
+
       // Add to new track with non-overlapping position
       const startTime = findNonOverlappingPosition(track.id, dropTime, duration)
       blocks.value.push({
@@ -359,32 +344,32 @@ const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, exclu
   const trackBlocks = blocks.value.filter(
     b => b.trackId === trackId && b.fileId !== excludeFileId
   )
-  
+
   if (trackBlocks.length === 0) {
     return Math.max(0, preferredTime)
   }
 
   // Sort blocks by start time
   const sortedBlocks = [...trackBlocks].sort((a, b) => a.startTime - b.startTime)
-  
+
   const blockEndTime = preferredTime + blockDuration
-  
+
   // Check if preferred position overlaps with any block
   const overlappingBlock = sortedBlocks.find(block => {
     const blockStart = block.startTime
     const blockEnd = block.startTime + block.duration
     return (preferredTime < blockEnd && blockEndTime > blockStart)
   })
-  
+
   if (!overlappingBlock) {
     // No overlap, use preferred position
     return Math.max(0, preferredTime)
   }
-  
+
   // Find the best position: either before or after the overlapping block
   const overlapStart = overlappingBlock.startTime
   const overlapEnd = overlappingBlock.startTime + overlappingBlock.duration
-  
+
   // Check if we can place it before (to the left)
   const beforePosition = overlapStart - blockDuration
   if (beforePosition >= 0) {
@@ -394,23 +379,23 @@ const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, exclu
       const blockEnd = block.startTime + block.duration
       return (beforePosition < blockEnd && beforePosition + blockDuration > block.startTime)
     })
-    
+
     if (!wouldOverlapBefore) {
       return beforePosition
     }
   }
-  
+
   // Place it after (to the right) of the overlapping block
   const afterPosition = overlapEnd
-  
+
   // Check if this position doesn't overlap with subsequent blocks
   let finalPosition = afterPosition
   for (const block of sortedBlocks) {
     if (block.startTime < afterPosition) continue
-    
+
     const blockStart = block.startTime
     const blockEnd = block.startTime + block.duration
-    
+
     if (afterPosition < blockEnd && afterPosition + blockDuration > blockStart) {
       // Would overlap, move to after this block
       finalPosition = blockEnd
@@ -418,7 +403,7 @@ const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, exclu
       break
     }
   }
-  
+
   return finalPosition
 }
 
@@ -478,6 +463,12 @@ const handleMuteToggle = ({ trackIndex, isMuted }) => {
   }
 }
 
+// Master volume control
+const handleMasterVolumeChange = (event) => {
+  masterVolume.value = Number(event.target.value)
+  setMasterVolume(masterVolume.value / 100)
+}
+
 // Playback
 const togglePlayPause = async () => {
   if (isPlaying.value) {
@@ -501,7 +492,7 @@ const play = async () => {
       // Only play blocks that haven't started yet or are currently playing
       const blockStartTime = block.startTime
       const blockEndTime = block.startTime + block.duration
-      
+
       if (currentTime.value < blockEndTime) {
         try {
           const offset = Math.max(0, currentTime.value - blockStartTime)
@@ -520,12 +511,12 @@ const play = async () => {
     if (isPlaying.value) {
       const elapsed = (Date.now() - startTimestamp) / 1000
       currentTime.value = playbackStartTime.value + elapsed
-      
+
       // Check if all blocks have finished
-      const maxEndTime = blocks.value.length > 0 
+      const maxEndTime = blocks.value.length > 0
         ? Math.max(...blocks.value.map(b => b.startTime + b.duration))
         : 0
-      
+
       if (currentTime.value >= maxEndTime) {
         stop()
       } else {
@@ -662,8 +653,44 @@ watch(uploadedFiles, (newFiles) => {
   min-width: 80px;
 }
 
-.btn-add-track {
+.header-actions {
   display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.master-volume-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f0f2ff;
+  border-radius: 8px;
+}
+
+.master-volume-label {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.master-volume-slider {
+  width: 120px;
+  height: 6px;
+  cursor: pointer;
+}
+
+.master-volume-value {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #667eea;
+  min-width: 45px;
+  text-align: right;
+}
+
+.btn-add-track {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
@@ -674,6 +701,7 @@ watch(uploadedFiles, (newFiles) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  width: auto;
 }
 
 .btn-add-track:hover {
@@ -793,6 +821,12 @@ watch(uploadedFiles, (newFiles) => {
   text-align: center;
   color: #666;
   font-size: 0.95em;
+}
+
+.track-actions {
+  padding: 10px 20px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .tracks-container {

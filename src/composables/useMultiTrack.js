@@ -8,6 +8,7 @@ export function useMultiTrack() {
   const audioBuffers = ref(new Map()) // Map<fileId, AudioBuffer>
   const sourceNodes = ref(new Map()) // Map<fileId, AudioBufferSourceNode>
   const gainNodes = ref(new Map()) // Map<fileId, GainNode>
+  const masterGainNode = ref(null)
   const isPlaying = ref(false)
   const currentTime = ref(0)
   const playbackStartTime = ref(0)
@@ -39,14 +40,31 @@ export function useMultiTrack() {
     }
   }
 
+  // Create master gain node
+  const createMasterGainNode = () => {
+    if (!audioContext.value || masterGainNode.value) return masterGainNode.value
+    
+    const masterGain = audioContext.value.createGain()
+    masterGain.gain.value = 1.0
+    masterGain.connect(audioContext.value.destination)
+    masterGainNode.value = masterGain
+    return masterGain
+  }
+
   // Create gain node for a track
   const createGainNode = (fileId) => {
     if (!audioContext.value) return null
     
+    // Ensure master gain node exists
+    if (!masterGainNode.value) {
+      createMasterGainNode()
+    }
+    
     const gainNode = audioContext.value.createGain()
     gainNode.gain.value = 1.0
     gainNodes.value.set(fileId, gainNode)
-    gainNode.connect(audioContext.value.destination)
+    // Connect to master gain instead of destination
+    gainNode.connect(masterGainNode.value)
     return gainNode
   }
 
@@ -107,6 +125,16 @@ export function useMultiTrack() {
     }
   }
 
+  // Set master volume
+  const setMasterVolume = (volume) => {
+    if (!masterGainNode.value) {
+      createMasterGainNode()
+    }
+    if (masterGainNode.value) {
+      masterGainNode.value.gain.value = volume
+    }
+  }
+
   // Stop all playing audio
   const stopAll = () => {
     sourceNodes.value.forEach((source, fileId) => {
@@ -126,6 +154,7 @@ export function useMultiTrack() {
     audioBuffers.value.clear()
     sourceNodes.value.clear()
     gainNodes.value.clear()
+    masterGainNode.value = null
     if (audioContext.value) {
       audioContext.value.close().catch(() => {})
       audioContext.value = null
@@ -146,6 +175,7 @@ export function useMultiTrack() {
     playBlock,
     stopBlock,
     setVolume,
+    setMasterVolume,
     stopAll,
     cleanup
   }
