@@ -1,6 +1,5 @@
 <template>
   <div class="loop-controls">
-    <h3>Loop Controls</h3>
     <div class="loop-time-inputs">
       <button 
         class="loop-btn loop-clear" 
