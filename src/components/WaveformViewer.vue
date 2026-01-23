@@ -174,6 +174,8 @@ const {
   handleCanvasMouseMove: handleCanvasMouseMoveBase,
   handleCanvasMouseUp: handleCanvasMouseUpBase,
   getTimeFromPosition,
+  getLoopMarkerPosition,
+  getLoopRangeStyle,
   cleanup: cleanupWaveform
 } = useWaveform(
   () => props.audioPlayer,
@@ -197,100 +199,27 @@ defineExpose({
   drawWaveform
 })
 
-// Computed properties for loop marker positions
-// These must match the EXACT calculation in useWaveform.js drawWaveform function
+// Computed properties for loop marker positions - using shared helper functions
 const loopStartPosition = computed(() => {
   if (props.loopStart === null || !props.duration) return '0%'
   
-  // Use the exact same calculation as useWaveform.js
-  const durationVal = props.duration
-  const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
-  const loopStartVal = props.loopStart
+  const position = getLoopMarkerPosition(props.loopStart)
+  if (!position) return '0%'
   
-  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) return '0%'
-  
-  const visibleDuration = durationVal / zoomLevelVal
-  const maxOffset = Math.max(0, durationVal - visibleDuration)
-  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
-  const visibleStart = clampedOffset
-  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
-  
-  // Match the exact logic from useWaveform.js (lines 229-235)
-  if (loopStartVal >= visibleStart && loopStartVal <= visibleEnd) {
-    // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
-    const position = ((loopStartVal - visibleStart) / visibleDuration) * 100
-    return `${Math.max(0, Math.min(100, position))}%`
-  } else if (loopStartVal < visibleStart) {
-    return '-6px'
-  } else {
-    return 'calc(100% + 6px)'
-  }
+  return position.type === 'percentage' ? `${position.value}%` : position.value
 })
 
 const loopEndPosition = computed(() => {
   if (props.loopEnd === null || !props.duration) return '0%'
   
-  // Use the exact same calculation as useWaveform.js
-  const durationVal = props.duration
-  const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
-  const loopEndVal = props.loopEnd
+  const position = getLoopMarkerPosition(props.loopEnd)
+  if (!position) return '0%'
   
-  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) return '0%'
-  
-  const visibleDuration = durationVal / zoomLevelVal
-  const maxOffset = Math.max(0, durationVal - visibleDuration)
-  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
-  const visibleStart = clampedOffset
-  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
-  
-  // Match the exact logic from useWaveform.js (lines 249-255)
-  if (loopEndVal >= visibleStart && loopEndVal <= visibleEnd) {
-    // Use the exact same formula: (time - visibleStart) / visibleDuration * 100%
-    const position = ((loopEndVal - visibleStart) / visibleDuration) * 100
-    return `${Math.max(0, Math.min(100, position))}%`
-  } else if (loopEndVal < visibleStart) {
-    return '-6px'
-  } else {
-    return 'calc(100% + 6px)'
-  }
+  return position.type === 'percentage' ? `${position.value}%` : position.value
 })
 
 const loopRangeStyle = computed(() => {
-  if (props.loopStart === null || props.loopEnd === null || !props.duration) {
-    return { left: '0%', width: '0%' }
-  }
-  
-  // Use the exact same calculation as useWaveform.js
-  const durationVal = props.duration
-  const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
-  const loopStartVal = props.loopStart
-  const loopEndVal = props.loopEnd
-  
-  if (!zoomLevelVal || zoomLevelVal <= 0 || !durationVal || durationVal <= 0) {
-    return { left: '0%', width: '0%' }
-  }
-  
-  const visibleDuration = durationVal / zoomLevelVal
-  const maxOffset = Math.max(0, durationVal - visibleDuration)
-  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
-  const visibleStart = clampedOffset
-  const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
-  
-  // Match the exact logic from useWaveform.js (lines 269-270)
-  const startX = Math.max(0, (loopStartVal - visibleStart) / visibleDuration * 100)
-  const endX = Math.min(100, (loopEndVal - visibleStart) / visibleDuration * 100)
-  
-  if (endX <= startX) {
-    return { left: '0%', width: '0%' }
-  }
-  
-  return {
-    left: `${startX}%`,
-    width: `${endX - startX}%`
-  }
+  return getLoopRangeStyle(props.loopStart, props.loopEnd)
 })
 
 // Local scrollbar value for v-model binding

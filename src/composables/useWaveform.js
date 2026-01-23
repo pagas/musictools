@@ -389,6 +389,71 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     }
   })
 
+  // Helper function to calculate loop marker position (percentage or offset)
+  const getLoopMarkerPosition = (time) => {
+    if (time === null || time === undefined) return null
+    
+    const durationVal = getValue(duration)
+    const zoomLevelVal = getValue(zoomLevel)
+    const zoomOffsetVal = getValue(zoomOffset)
+    
+    if (!durationVal || durationVal <= 0 || !zoomLevelVal || zoomLevelVal <= 0) {
+      return null
+    }
+    
+    const visibleDuration = durationVal / zoomLevelVal
+    const maxOffset = Math.max(0, durationVal - visibleDuration)
+    const validZoomOffset = (typeof zoomOffsetVal === 'number' && !isNaN(zoomOffsetVal)) ? zoomOffsetVal : 0
+    const clampedOffset = Math.max(0, Math.min(maxOffset, validZoomOffset))
+    const visibleStart = clampedOffset
+    const visibleEnd = Math.min(durationVal, clampedOffset + visibleDuration)
+    
+    if (time >= visibleStart && time <= visibleEnd) {
+      // Position within visible range - return as percentage
+      const position = ((time - visibleStart) / visibleDuration) * 100
+      return { type: 'percentage', value: Math.max(0, Math.min(100, position)) }
+    } else if (time < visibleStart) {
+      // Position before visible range
+      return { type: 'offset', value: '-6px' }
+    } else {
+      // Position after visible range
+      return { type: 'offset', value: 'calc(100% + 6px)' }
+    }
+  }
+  
+  // Helper function to calculate loop range style
+  const getLoopRangeStyle = (loopStart, loopEnd) => {
+    if (loopStart === null || loopEnd === null) {
+      return { left: '0%', width: '0%' }
+    }
+    
+    const durationVal = getValue(duration)
+    const zoomLevelVal = getValue(zoomLevel)
+    const zoomOffsetVal = getValue(zoomOffset)
+    
+    if (!durationVal || durationVal <= 0 || !zoomLevelVal || zoomLevelVal <= 0) {
+      return { left: '0%', width: '0%' }
+    }
+    
+    const visibleDuration = durationVal / zoomLevelVal
+    const maxOffset = Math.max(0, durationVal - visibleDuration)
+    const validZoomOffset = (typeof zoomOffsetVal === 'number' && !isNaN(zoomOffsetVal)) ? zoomOffsetVal : 0
+    const clampedOffset = Math.max(0, Math.min(maxOffset, validZoomOffset))
+    const visibleStart = clampedOffset
+    
+    const startX = Math.max(0, (loopStart - visibleStart) / visibleDuration * 100)
+    const endX = Math.min(100, (loopEnd - visibleStart) / visibleDuration * 100)
+    
+    if (endX <= startX) {
+      return { left: '0%', width: '0%' }
+    }
+    
+    return {
+      left: `${startX}%`,
+      width: `${endX - startX}%`
+    }
+  }
+
   return {
     waveformCanvas,
     progressWrapper,
@@ -405,6 +470,8 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
     handleCanvasMouseMove,
     handleCanvasMouseUp,
     getTimeFromPosition,
+    getLoopMarkerPosition,
+    getLoopRangeStyle,
     cleanup
   }
 }
