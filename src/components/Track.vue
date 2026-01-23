@@ -6,62 +6,64 @@
     @dragover.prevent="isActive = true"
     @dragleave="isActive = false"
   >
-    <div class="track-header">
-      <input 
-        v-model="trackName" 
-        class="track-name-input"
-        @blur="handleNameChange"
-        placeholder="Track name"
-      />
-      <div class="track-controls">
-        <button 
-          class="track-btn track-mute"
-          :class="{ active: isMuted }"
-          @click="toggleMute"
-          :title="isMuted ? 'Unmute' : 'Mute'"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path v-if="!isMuted" d="M11 5L6 9H2v6h4l5 4V5zM19 9l-6 6M13 9l6 6"/>
-            <path v-else d="M11 5L6 9H2v6h4l5 4V5z"/>
-          </svg>
-        </button>
-        <input
-          type="range"
-          class="track-volume"
-          min="0"
-          max="100"
-          :value="volume"
-          @input="handleVolumeChange"
-          title="Volume"
+    <div class="track-wrapper">
+      <div class="track-content" ref="trackContentRef">
+        <AudioBlock
+          v-for="block in blocks"
+          :key="block.fileId"
+          :file="block.file"
+          :fileId="block.fileId"
+          :duration="block.duration"
+          :startTime="block.startTime"
+          :trackIndex="trackIndex"
+          :pixelsPerSecond="pixelsPerSecond"
+          :isPlaying="playingBlocks.has(block.fileId)"
+          :color="block.color"
+          @drag-start="handleBlockDragStart"
+          @drag-move="handleBlockDragMove"
+          @drag-end="handleBlockDragEnd"
+          @delete="handleBlockDelete"
         />
-        <button 
-          class="track-btn track-delete"
-          @click="handleDelete"
-          title="Delete track"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          </svg>
-        </button>
       </div>
-    </div>
-    <div class="track-content" ref="trackContentRef">
-      <AudioBlock
-        v-for="block in blocks"
-        :key="block.fileId"
-        :file="block.file"
-        :fileId="block.fileId"
-        :duration="block.duration"
-        :startTime="block.startTime"
-        :trackIndex="trackIndex"
-        :pixelsPerSecond="pixelsPerSecond"
-        :isPlaying="playingBlocks.has(block.fileId)"
-        :color="block.color"
-        @drag-start="handleBlockDragStart"
-        @drag-move="handleBlockDragMove"
-        @drag-end="handleBlockDragEnd"
-        @delete="handleBlockDelete"
-      />
+      <div class="track-header">
+        <input 
+          v-model="trackName" 
+          class="track-name-input"
+          @blur="handleNameChange"
+          placeholder="Track name"
+        />
+        <div class="track-controls">
+          <button 
+            class="track-btn track-mute"
+            :class="{ active: isMuted }"
+            @click="toggleMute"
+            :title="isMuted ? 'Unmute' : 'Mute'"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path v-if="!isMuted" d="M11 5L6 9H2v6h4l5 4V5zM19 9l-6 6M13 9l6 6"/>
+              <path v-else d="M11 5L6 9H2v6h4l5 4V5z"/>
+            </svg>
+          </button>
+          <input
+            type="range"
+            class="track-volume"
+            min="0"
+            max="100"
+            :value="volume"
+            @input="handleVolumeChange"
+            title="Volume"
+          />
+          <button 
+            class="track-btn track-delete"
+            @click="handleDelete"
+            title="Delete track"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -201,30 +203,43 @@ const toggleMute = () => {
 
 <style scoped>
 .track {
-  border-bottom: 2px solid #e0e0e0;
   background: #fafafa;
   transition: background 0.2s ease;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .track.track-active {
   background: #f0f2ff;
 }
 
+.track-wrapper {
+  position: relative;
+}
+
 .track-header {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 12px 15px;
-  background: white;
+  gap: 4px;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  border-left: 1px solid #e0e0e0;
   border-bottom: 1px solid #e0e0e0;
+  border-radius: 0 0 0 4px;
+  z-index: 5;
+  min-height: 24px;
+  pointer-events: auto;
 }
 
 .track-name-input {
-  flex: 1;
+  width: 100px;
   border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.95em;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 0.75em;
   font-weight: 600;
   color: #333;
   min-width: 0;
@@ -239,21 +254,22 @@ const toggleMute = () => {
 .track-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 3px;
 }
 
 .track-btn {
   background: transparent;
   border: 1px solid #ddd;
-  border-radius: 6px;
-  width: 36px;
-  height: 36px;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: #666;
   transition: all 0.2s ease;
+  padding: 0;
 }
 
 .track-btn:hover {
@@ -269,13 +285,13 @@ const toggleMute = () => {
 }
 
 .track-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
 }
 
 .track-volume {
-  width: 100px;
-  height: 6px;
+  width: 60px;
+  height: 3px;
   cursor: pointer;
 }
 
