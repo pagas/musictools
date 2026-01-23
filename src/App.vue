@@ -10,7 +10,6 @@
         class="tab-btn" 
         :class="{ active: activeTab === 'slowdowner' }"
         @click="activeTab = 'slowdowner'"
-        :disabled="!currentFile"
       >
         🎚️ Slow Downer
       </button>
@@ -18,7 +17,6 @@
         class="tab-btn" 
         :class="{ active: activeTab === 'analyzer' }"
         @click="activeTab = 'analyzer'"
-        :disabled="!currentFile"
       >
         🔍 Music Analyzer
       </button>

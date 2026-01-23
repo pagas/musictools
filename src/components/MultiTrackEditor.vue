@@ -40,8 +40,17 @@
         </button>
       </div>
       <div class="library-grid" v-if="uploadedFiles.length > 0">
-        <div v-for="file in uploadedFiles" :key="file.id" class="library-item" :style="{ backgroundColor: file.color }"
-          draggable="true" @dragstart="handleLibraryDragStart($event, file)">
+        <div 
+          v-for="file in uploadedFiles" 
+          :key="file.id" 
+          class="library-item" 
+          :class="{ 'library-item-dragging': touchDragState.isDragging && touchDragState.file?.id === file.id }"
+          :style="{ backgroundColor: file.color }"
+          draggable="true" 
+          @dragstart="handleLibraryDragStart($event, file)"
+          @touchstart="handleLibraryTouchStart($event, file)"
+          @touchmove="handleLibraryTouchMove($event)"
+          @touchend="handleLibraryTouchEnd($event)">
           <div class="library-item-icon">🎵</div>
           <div class="library-item-info">
             <div class="library-item-name">{{ getSummarizedName(file.file?.name || 'Unknown file') }}</div>
@@ -113,7 +122,10 @@
             </div>
           </div>
         </div>
-        <div class="tracks-scroll-wrapper" ref="tracksScrollWrapperRef">
+        <div 
+          class="tracks-scroll-wrapper" 
+          ref="tracksScrollWrapperRef"
+        >
           <div class="tracks-wrapper" :style="{ width: `${maxTrackWidth}px` }">
             <!-- Single playhead line spanning all tracks -->
             <div 
@@ -147,6 +159,39 @@ const tracksContainerRef = ref(null)
 const tracksScrollWrapperRef = ref(null)
 const timeRulerScrollRef = ref(null)
 const isDragging = ref(false)
+
+// Touch drag state for mobile
+const touchDragState = ref({
+  isDragging: false,
+  file: null,
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  currentY: 0,
+  activeTrackIndex: null
+})
+
+// Track if a block is being dragged (to prevent scrolling)
+const isBlockDragging = ref(false)
+
+// Track block drag state for cross-track dragging on mobile
+const blockDragState = ref({
+  isDragging: false,
+  blockId: null,
+  sourceTrackIndex: null,
+  currentTrackIndex: null,
+  currentX: 0,
+  currentY: 0
+})
+
+// Track touch start position to detect scrollbar touches
+const touchStartPosition = ref({ x: 0, y: 0, isOnScrollbar: false })
+
+// Store global touch handlers for cleanup
+let globalTouchMoveHandler = null
+let globalTouchEndHandler = null
+let scrollWrapperTouchMoveHandler = null
+let scrollWrapperTouchStartHandler = null
 const basePixelsPerSecond = 50
 const zoomLevel = ref(1.0)
 const pixelsPerSecond = computed(() => basePixelsPerSecond * zoomLevel.value)
@@ -242,6 +287,102 @@ onMounted(() => {
   // Listen to ruler scroll and sync to tracks
   if (timeRulerScrollRef.value) {
     timeRulerScrollRef.value.addEventListener('scroll', syncTracksToRuler)
+  }
+  
+  // Track touch start to detect if it's on the scrollbar
+  scrollWrapperTouchStartHandler = (event) => {
+    const touch = event.touches[0]
+    if (!touch || !tracksScrollWrapperRef.value) return
+    
+    const rect = tracksScrollWrapperRef.value.getBoundingClientRect()
+    const scrollbarHeight = 12 // Height of scrollbar from CSS
+    const touchY = touch.clientY - rect.top
+    const containerHeight = rect.height
+    
+    // Check if touch is in the scrollbar area (bottom of container)
+    // Add some tolerance for easier targeting
+    const scrollbarAreaHeight = Math.max(scrollbarHeight, 20) // At least 20px for easier touch
+    const isOnScrollbar = touchY >= (containerHeight - scrollbarAreaHeight)
+    
+    touchStartPosition.value = {
+      x: touch.clientX,
+      y: touch.clientY,
+      isOnScrollbar: isOnScrollbar
+    }
+  }
+  
+  // Prevent scrolling when dragging blocks, but allow scrolling when touching scrollbar
+  scrollWrapperTouchMoveHandler = (event) => {
+    // If a block is being dragged, always prevent scrolling
+    if (isBlockDragging.value) {
+      event.preventDefault()
+      return
+    }
+    
+    // Only allow scrolling if touch started on the scrollbar
+    if (!touchStartPosition.value.isOnScrollbar) {
+      // Prevent scrolling for non-scrollbar areas
+      event.preventDefault()
+    }
+    // If touch started on scrollbar, don't prevent default - allow native scrolling
+  }
+  
+  if (tracksScrollWrapperRef.value) {
+    tracksScrollWrapperRef.value.addEventListener('touchstart', scrollWrapperTouchStartHandler, { passive: true })
+    tracksScrollWrapperRef.value.addEventListener('touchmove', scrollWrapperTouchMoveHandler, { passive: false })
+  }
+  
+  // Global touch move handler for mobile drag
+  const handleGlobalTouchMove = (event) => {
+    if (touchDragState.value.file) {
+      handleLibraryTouchMove(event)
+    }
+  }
+  
+  // Global touch end handler for mobile drag
+  const handleGlobalTouchEnd = (event) => {
+    if (touchDragState.value.file) {
+      handleLibraryTouchEnd(event)
+    }
+  }
+  
+  // Store handlers for cleanup
+  globalTouchMoveHandler = handleGlobalTouchMove
+  globalTouchEndHandler = handleGlobalTouchEnd
+  
+  document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
+  document.addEventListener('touchend', handleGlobalTouchEnd, { passive: false })
+  document.addEventListener('touchcancel', handleGlobalTouchEnd, { passive: false })
+  
+  // Return cleanup function
+  return () => {
+    document.removeEventListener('touchmove', handleGlobalTouchMove)
+    document.removeEventListener('touchend', handleGlobalTouchEnd)
+    document.removeEventListener('touchcancel', handleGlobalTouchEnd)
+  }
+})
+
+onUnmounted(() => {
+  // Clean up global touch handlers
+  if (globalTouchMoveHandler) {
+    document.removeEventListener('touchmove', globalTouchMoveHandler)
+  }
+  if (globalTouchEndHandler) {
+    document.removeEventListener('touchend', globalTouchEndHandler)
+    document.removeEventListener('touchcancel', globalTouchEndHandler)
+  }
+  // Clean up scroll wrapper touch handlers
+  if (tracksScrollWrapperRef.value) {
+    if (scrollWrapperTouchStartHandler) {
+      tracksScrollWrapperRef.value.removeEventListener('touchstart', scrollWrapperTouchStartHandler)
+    }
+    if (scrollWrapperTouchMoveHandler) {
+      tracksScrollWrapperRef.value.removeEventListener('touchmove', scrollWrapperTouchMoveHandler)
+    }
+  }
+  // Restore scrolling if still dragging
+  if (touchDragState.value.isDragging) {
+    document.body.style.overflow = ''
   }
 })
 
@@ -406,6 +547,147 @@ const handleLibraryDragStart = (event, file) => {
   }))
 }
 
+// Touch handlers for mobile drag and drop
+const handleLibraryTouchStart = (event, file) => {
+  const touch = event.touches[0]
+  touchDragState.value = {
+    isDragging: false, // Start as false, will be set to true after threshold
+    file: file,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    currentX: touch.clientX,
+    currentY: touch.clientY,
+    activeTrackIndex: null
+  }
+}
+
+const handleLibraryTouchMove = (event) => {
+  if (!touchDragState.value.file) return
+  
+  const touch = event.touches[0]
+  const deltaX = Math.abs(touch.clientX - touchDragState.value.startX)
+  const deltaY = Math.abs(touch.clientY - touchDragState.value.startY)
+  const threshold = 10 // pixels
+  
+  // Only start dragging if moved beyond threshold
+  if (!touchDragState.value.isDragging && (deltaX > threshold || deltaY > threshold)) {
+    touchDragState.value.isDragging = true
+    // Prevent scrolling while dragging
+    document.body.style.overflow = 'hidden'
+    event.preventDefault()
+  }
+  
+  if (!touchDragState.value.isDragging) return
+  
+  event.preventDefault()
+  touchDragState.value.currentX = touch.clientX
+  touchDragState.value.currentY = touch.clientY
+  
+  // Find which track (if any) is under the touch point
+  const trackElements = document.querySelectorAll('.track')
+  let activeTrackIndex = null
+  
+  trackElements.forEach((trackEl, index) => {
+    const rect = trackEl.getBoundingClientRect()
+    if (
+      touch.clientX >= rect.left &&
+      touch.clientX <= rect.right &&
+      touch.clientY >= rect.top &&
+      touch.clientY <= rect.bottom
+    ) {
+      activeTrackIndex = index
+    }
+  })
+  
+  touchDragState.value.activeTrackIndex = activeTrackIndex
+  
+  // Update visual feedback on tracks
+  trackElements.forEach((trackEl, index) => {
+    if (index === activeTrackIndex) {
+      trackEl.classList.add('track-active')
+    } else {
+      trackEl.classList.remove('track-active')
+    }
+  })
+}
+
+const handleLibraryTouchEnd = (event) => {
+  if (!touchDragState.value.file) {
+    // Reset state if drag never started
+    touchDragState.value = {
+      isDragging: false,
+      file: null,
+      startX: 0,
+      startY: 0,
+      currentX: 0,
+      currentY: 0,
+      activeTrackIndex: null
+    }
+    return
+  }
+  
+  if (!touchDragState.value.isDragging) {
+    // If drag never started (below threshold), reset and return
+    touchDragState.value = {
+      isDragging: false,
+      file: null,
+      startX: 0,
+      startY: 0,
+      currentX: 0,
+      currentY: 0,
+      activeTrackIndex: null
+    }
+    return
+  }
+  
+  event.preventDefault()
+  const { file, activeTrackIndex, currentX, currentY } = touchDragState.value
+  
+  // Restore scrolling
+  document.body.style.overflow = ''
+  
+  // If dropped on a track, handle the drop
+  if (activeTrackIndex !== null && file) {
+    const trackElements = document.querySelectorAll('.track')
+    const trackEl = trackElements[activeTrackIndex]
+    if (trackEl) {
+      const trackContent = trackEl.querySelector('.track-content')
+      if (trackContent) {
+        const rect = trackContent.getBoundingClientRect()
+        const scrollWrapper = tracksScrollWrapperRef.value
+        const scrollLeft = scrollWrapper ? scrollWrapper.scrollLeft : 0
+        const x = (currentX - rect.left) + scrollLeft
+        const dropTime = Math.max(0, x / pixelsPerSecond.value)
+        
+        handleDropBlock({
+          fileId: file.id,
+          file: file.file,
+          duration: file.duration,
+          trackIndex: activeTrackIndex,
+          dropTime,
+          color: file.color
+        })
+      }
+    }
+  }
+  
+  // Clean up visual feedback
+  document.querySelectorAll('.track').forEach(trackEl => {
+    trackEl.classList.remove('track-active')
+  })
+  
+  // Reset touch drag state
+  touchDragState.value = {
+    isDragging: false,
+    file: null,
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    currentY: 0,
+    activeTrackIndex: null
+  }
+}
+
 const handleDropBlock = ({ blockId, fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null, color = null }) => {
   const track = tracks.value[trackIndex]
   if (!track) return
@@ -531,13 +813,66 @@ const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, exclu
   return finalPosition
 }
 
-const handleBlockDragStart = ({ blockId }) => {
-  // Block drag started
-}
-
-const handleBlockDragMove = ({ blockId, newStartTime }) => {
+const handleBlockDragStart = ({ blockId, trackIndex }) => {
+  // Block drag started - prevent scrolling
+  isBlockDragging.value = true
+  
+  // Track block drag state for cross-track dragging
   const block = blocks.value.find(b => b.blockId === blockId)
   if (block) {
+    blockDragState.value = {
+      isDragging: true,
+      blockId: blockId,
+      sourceTrackIndex: trackIndex,
+      currentTrackIndex: trackIndex,
+      currentX: 0,
+      currentY: 0
+    }
+  }
+}
+
+const handleBlockDragMove = ({ blockId, newStartTime, currentX, currentY }) => {
+  const block = blocks.value.find(b => b.blockId === blockId)
+  if (!block) return
+  
+  // Update drag state with current position
+  if (blockDragState.value.isDragging && blockDragState.value.blockId === blockId) {
+    // Update current position
+    if (currentX !== undefined) blockDragState.value.currentX = currentX
+    if (currentY !== undefined) blockDragState.value.currentY = currentY
+    
+    // Find which track the touch is currently over
+    const trackElements = document.querySelectorAll('.track')
+    let currentTrackIndex = blockDragState.value.sourceTrackIndex
+    
+    if (currentX !== undefined && currentY !== undefined) {
+      trackElements.forEach((trackEl, index) => {
+        const rect = trackEl.getBoundingClientRect()
+        if (
+          currentX >= rect.left &&
+          currentX <= rect.right &&
+          currentY >= rect.top &&
+          currentY <= rect.bottom
+        ) {
+          currentTrackIndex = index
+        }
+      })
+    }
+    
+    blockDragState.value.currentTrackIndex = currentTrackIndex
+    
+    // Update visual feedback on tracks
+    trackElements.forEach((trackEl, index) => {
+      if (index === currentTrackIndex && index !== blockDragState.value.sourceTrackIndex) {
+        trackEl.classList.add('track-active')
+      } else {
+        trackEl.classList.remove('track-active')
+      }
+    })
+  }
+  
+  // Only update position if dragging within the same track
+  if (block.trackId === tracks.value[blockDragState.value.sourceTrackIndex]?.id) {
     // Find non-overlapping position for the dragged block
     const validStartTime = findNonOverlappingPosition(
       block.trackId,
@@ -551,6 +886,56 @@ const handleBlockDragMove = ({ blockId, newStartTime }) => {
 
 const handleBlockDragEnd = ({ blockId }) => {
   // Block drag ended
+  isBlockDragging.value = false
+  
+  // Handle cross-track drop if needed
+  if (blockDragState.value.isDragging && blockDragState.value.blockId === blockId) {
+    const { sourceTrackIndex, currentTrackIndex, currentX, currentY } = blockDragState.value
+    
+    // If dropped on a different track, handle the drop
+    if (currentTrackIndex !== null && currentTrackIndex !== sourceTrackIndex && currentX > 0 && currentY > 0) {
+      const block = blocks.value.find(b => b.blockId === blockId)
+      if (block) {
+        const trackElements = document.querySelectorAll('.track')
+        const targetTrackEl = trackElements[currentTrackIndex]
+        if (targetTrackEl) {
+          const trackContent = targetTrackEl.querySelector('.track-content')
+          if (trackContent) {
+            const rect = trackContent.getBoundingClientRect()
+            const scrollWrapper = tracksScrollWrapperRef.value
+            const scrollLeft = scrollWrapper ? scrollWrapper.scrollLeft : 0
+            const x = (currentX - rect.left) + scrollLeft
+            const dropTime = Math.max(0, x / pixelsPerSecond.value)
+            
+            handleDropBlock({
+              blockId: block.blockId,
+              fileId: block.fileId,
+              duration: block.duration,
+              trackIndex: currentTrackIndex,
+              dropTime,
+              sourceTrackIndex: sourceTrackIndex,
+              color: block.color
+            })
+          }
+        }
+      }
+    }
+    
+    // Clean up visual feedback
+    document.querySelectorAll('.track').forEach(trackEl => {
+      trackEl.classList.remove('track-active')
+    })
+  }
+  
+  // Reset block drag state
+  blockDragState.value = {
+    isDragging: false,
+    blockId: null,
+    sourceTrackIndex: null,
+    currentTrackIndex: null,
+    currentX: 0,
+    currentY: 0
+  }
 }
 
 const handleBlockDelete = ({ trackIndex, blockId }) => {
@@ -563,6 +948,7 @@ const handleBlockDelete = ({ trackIndex, blockId }) => {
     }
   }
 }
+
 
 // Volume and mute
 const handleVolumeChange = ({ trackIndex, volume }) => {
@@ -921,6 +1307,42 @@ watch(uploadedFiles, (newFiles) => {
   width: 120px;
   height: 6px;
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #ddd;
+  border-radius: 3px;
+  outline: none;
+}
+
+.master-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.master-volume-slider::-webkit-slider-thumb:hover {
+  background: #5568d3;
+  transform: scale(1.1);
+}
+
+.master-volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.master-volume-slider::-moz-range-thumb:hover {
+  background: #5568d3;
+  transform: scale(1.1);
 }
 
 .master-volume-value {
@@ -929,6 +1351,149 @@ watch(uploadedFiles, (newFiles) => {
   color: #667eea;
   min-width: 45px;
   text-align: right;
+}
+
+/* Mobile responsive styles for editor-header */
+@media (max-width: 768px) {
+  .editor-header {
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .play-btn,
+  .stop-btn {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+  }
+
+  .play-btn svg,
+  .stop-btn svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .time-display {
+    font-size: 1.1em;
+    min-width: 70px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .master-volume-control {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 280px;
+    padding: 12px;
+  }
+
+  .master-volume-label {
+    font-size: 0.85em;
+    width: 100%;
+    text-align: center;
+  }
+
+  .master-volume-slider {
+    width: 100%;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .master-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+  }
+
+  .master-volume-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    border: none;
+  }
+
+  .master-volume-value {
+    font-size: 0.9em;
+    width: 100%;
+    text-align: center;
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .editor-header {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .header-controls {
+    gap: 10px;
+  }
+
+  .play-btn,
+  .stop-btn {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+  }
+
+  .play-btn svg,
+  .stop-btn svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .time-display {
+    font-size: 1em;
+    min-width: 60px;
+  }
+
+  .master-volume-control {
+    padding: 10px;
+    max-width: 100%;
+  }
+
+  .master-volume-label {
+    font-size: 0.8em;
+  }
+
+  .master-volume-slider {
+    height: 10px;
+  }
+
+  .master-volume-slider::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .master-volume-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .master-volume-value {
+    font-size: 0.85em;
+  }
 }
 
 .btn-add-track {
@@ -1029,6 +1594,14 @@ watch(uploadedFiles, (newFiles) => {
 
 .library-item:active {
   cursor: grabbing;
+}
+
+.library-item-dragging {
+  opacity: 0.6;
+  transform: scale(0.95);
+  cursor: grabbing !important;
+  z-index: 1000;
+  position: relative;
 }
 
 .library-item-icon {
@@ -1139,6 +1712,8 @@ watch(uploadedFiles, (newFiles) => {
   overflow-x: auto;
   overflow-y: hidden;
   position: relative;
+  -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+  touch-action: pan-x; /* Allow horizontal panning only - we'll control when to allow it */
 }
 
 .tracks-scroll-wrapper::-webkit-scrollbar {

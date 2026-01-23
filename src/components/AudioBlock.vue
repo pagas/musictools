@@ -73,10 +73,13 @@ const isDragging = ref(false)
 const dragStartX = ref(0)
 const dragStartTime = ref(0)
 const isHtml5Dragging = ref(false)
+const touchDragStarted = ref(false) // Track if touch drag has actually started (after threshold)
 let mouseMoveHandler = null
 let mouseUpHandler = null
 let touchMoveHandler = null
 let touchEndHandler = null
+let touchStartX = 0
+let touchStartY = 0
 
 const blockStyle = computed(() => {
   const width = props.duration * props.pixelsPerSecond
@@ -122,43 +125,107 @@ const handleMouseDown = (event) => {
   // Clean up any existing listeners first
   cleanupMouseListeners()
   
-  isDragging.value = true
-  dragStartX.value = event.clientX || event.touches[0].clientX
-  dragStartTime.value = props.startTime
+  const isTouch = event.type === 'touchstart' || event.touches
+  const clientX = isTouch ? event.touches[0].clientX : event.clientX
+  const clientY = isTouch ? event.touches[0].clientY : event.clientY
   
-  emit('drag-start', {
-    blockId: props.blockId,
-    fileId: props.fileId,
-    trackIndex: props.trackIndex,
-    startTime: props.startTime
-  })
+  // Store initial touch position for threshold detection
+  if (isTouch) {
+    touchStartX = clientX
+    touchStartY = clientY
+    touchDragStarted.value = false
+    // Don't prevent default yet - wait for threshold
+  } else {
+    // For mouse, start dragging immediately
+    isDragging.value = true
+    dragStartX.value = clientX
+    dragStartTime.value = props.startTime
+    
+    emit('drag-start', {
+      blockId: props.blockId,
+      fileId: props.fileId,
+      trackIndex: props.trackIndex,
+      startTime: props.startTime
+    })
+  }
+  
+  dragStartX.value = clientX
+  dragStartTime.value = props.startTime
 
   mouseMoveHandler = (moveEvent) => {
-    if (!isDragging.value || isHtml5Dragging.value) {
+    if (isHtml5Dragging.value) {
       cleanupMouseListeners()
       return
     }
     
-    const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0]?.clientX)
+    const isTouchMove = moveEvent.type === 'touchmove' || moveEvent.touches
+    const currentX = isTouchMove ? (moveEvent.touches?.[0]?.clientX) : moveEvent.clientX
+    const currentY = isTouchMove ? (moveEvent.touches?.[0]?.clientY) : moveEvent.clientY
+    
     if (currentX === undefined) return
+    
+    // For touch, check threshold before starting drag
+    if (isTouchMove && !touchDragStarted.value) {
+      const deltaX = Math.abs(currentX - touchStartX)
+      const deltaY = Math.abs(currentY - touchStartY)
+      const threshold = 10 // pixels
+      
+      // If moved beyond threshold, start dragging
+      if (deltaX > threshold || deltaY > threshold) {
+        touchDragStarted.value = true
+        isDragging.value = true
+        // Prevent scrolling now that we're dragging
+        document.body.style.overflow = 'hidden'
+        
+        emit('drag-start', {
+          blockId: props.blockId,
+          fileId: props.fileId,
+          trackIndex: props.trackIndex,
+          startTime: props.startTime
+        })
+      } else {
+        // Still below threshold, allow scrolling
+        return
+      }
+    }
+    
+    // Only process drag if dragging has started
+    if (!isDragging.value) return
+    
+    // Prevent default to stop scrolling during drag
+    if (isTouchMove) {
+      moveEvent.preventDefault()
+    }
     
     const deltaX = currentX - dragStartX.value
     const deltaTime = deltaX / props.pixelsPerSecond
     const newStartTime = Math.max(0, dragStartTime.value + deltaTime)
     
+    // Emit drag move with current position for cross-track tracking
     emit('drag-move', {
       blockId: props.blockId,
-      newStartTime
+      newStartTime,
+      currentX: currentX,
+      currentY: currentY
     })
   }
 
-  mouseUpHandler = () => {
+  mouseUpHandler = (upEvent) => {
+    const isTouchEnd = upEvent.type === 'touchend' || upEvent.type === 'touchcancel'
+    
+    // Restore scrolling if it was disabled
+    if (isTouchEnd && touchDragStarted.value) {
+      document.body.style.overflow = ''
+    }
+    
     if (isDragging.value) {
       isDragging.value = false
       emit('drag-end', {
         blockId: props.blockId
       })
     }
+    
+    touchDragStarted.value = false
     cleanupMouseListeners()
   }
 
@@ -167,8 +234,9 @@ const handleMouseDown = (event) => {
 
   document.addEventListener('mousemove', mouseMoveHandler)
   document.addEventListener('mouseup', mouseUpHandler)
-  document.addEventListener('touchmove', touchMoveHandler)
+  document.addEventListener('touchmove', touchMoveHandler, { passive: false })
   document.addEventListener('touchend', touchEndHandler)
+  document.addEventListener('touchcancel', touchEndHandler)
 }
 
 const handleDragStart = (event) => {

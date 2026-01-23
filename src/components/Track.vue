@@ -227,7 +227,11 @@ const handleDelete = () => {
 }
 
 const handleBlockDragStart = (data) => {
-  emit('block-drag-start', data)
+  // Add trackIndex to the drag start data
+  emit('block-drag-start', {
+    ...data,
+    trackIndex: props.trackIndex
+  })
 }
 
 const handleBlockDragMove = (data) => {
