@@ -99,18 +99,6 @@
           <path d="M3 21v-5h5"></path>
         </svg>
       </button>
-      <button 
-        class="zoom-btn zoom-fit" 
-        @click="zoomToLoop"
-        :disabled="loopStart === null || loopEnd === null"
-        title="Zoom to Loop"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <path d="M8 12h8"></path>
-          <path d="M12 8v8"></path>
-        </svg>
-      </button>
     </div>
   </div>
 </template>
@@ -174,7 +162,6 @@ const {
   zoomIn: zoomInFn,
   zoomOut: zoomOutFn,
   resetZoom: resetZoomFn,
-  zoomToLoop: zoomToLoopFn,
   handleWheelZoom: handleWheelZoomFn,
   handleScrollbarInput: handleScrollbarInputFn
 } = useZoom(() => props.duration, () => props.loopStart, () => props.loopEnd)
@@ -323,7 +310,6 @@ watch(scrollbarValue, (newValue) => {
 const zoomIn = () => zoomInFn(() => drawWaveform())
 const zoomOut = () => zoomOutFn(() => drawWaveform())
 const resetZoom = () => resetZoomFn(() => drawWaveform())
-const zoomToLoop = () => zoomToLoopFn(() => drawWaveform())
 const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, () => drawWaveform())
 const handleScrollbarInput = (event) => {
   isDraggingScrollbar.value = true
@@ -741,17 +727,8 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.zoom-reset,
-.zoom-fit {
-  margin-left: 4px;
-}
-
 .zoom-reset {
-  padding-left: 6px;
-  padding-right: 6px;
-}
-
-.zoom-fit {
+  margin-left: 4px;
   padding-left: 6px;
   padding-right: 6px;
 }

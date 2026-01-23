@@ -3,6 +3,7 @@
     <audio
       ref="audioPlayer"
       :src="audioUrl"
+      :loop="repeatTrack"
       preload="metadata"
       @loadedmetadata="handleLoadedMetadata"
       @timeupdate="handleTimeUpdate"
@@ -34,14 +35,14 @@
             </svg>
           </button>
           <button 
-            class="seek-btn seek-end-btn" 
-            @click="seekToEnd"
+            class="seek-btn repeat-btn" 
+            :class="{ active: repeatTrack }"
+            @click="toggleRepeat"
             :disabled="!duration || duration === 0"
-            title="Go to End"
+            title="Repeat Track"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="13 17 18 12 13 7"></polyline>
-              <polyline points="6 17 11 12 6 7"></polyline>
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
             </svg>
           </button>
           <VolumeControl
@@ -197,6 +198,9 @@ const {
 // Speed options
 const speedOptions = [0.25, 0.5, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2]
 
+// Repeat track state (for whole track, not loop)
+const repeatTrack = ref(false)
+
 // Initialize audio context for note detection
 const initAudioContext = () => {
   if (!audioPlayer.value) return
@@ -292,17 +296,14 @@ const seekToStart = () => {
   }
 }
 
-const seekToEnd = () => {
-  // If loop is set, go to loop end, otherwise go to end of track
-  if (loopStart.value !== null && loopEnd.value !== null) {
-    seek(loopEnd.value)
-  } else if (duration.value > 0) {
-    seek(duration.value)
-  }
+const toggleRepeat = () => {
+  // Toggle repeat for whole track
+  repeatTrack.value = !repeatTrack.value
 }
 
 const handleEnded = () => {
   // If loop is enabled and valid, restart from loop start
+  // (Note: repeatTrack is handled by audio element's loop property)
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
     if (audioPlayer.value) {
       requestAnimationFrame(() => {
@@ -314,8 +315,9 @@ const handleEnded = () => {
         }
       })
     }
-  } else {
-    // Reset to beginning
+  } else if (!repeatTrack.value) {
+    // Only reset to beginning if repeat is not enabled
+    // (If repeatTrack is true, the audio element will loop automatically)
     if (audioPlayer.value) {
       audioPlayer.value.currentTime = 0
     }
@@ -554,13 +556,22 @@ onMounted(() => {
   box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
 }
 
-.seek-end-btn {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
-  box-shadow: 0 3px 10px rgba(255, 107, 107, 0.4);
+.repeat-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
 }
 
-.seek-end-btn:hover:not(:disabled) {
-  box-shadow: 0 5px 15px rgba(255, 107, 107, 0.6);
+.repeat-btn:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
+}
+
+.repeat-btn.active {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  box-shadow: 0 3px 10px rgba(81, 207, 102, 0.4);
+}
+
+.repeat-btn.active:hover:not(:disabled) {
+  box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
 }
 
 .controls-row {
