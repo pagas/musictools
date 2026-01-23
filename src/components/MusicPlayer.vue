@@ -232,8 +232,10 @@ const initPitchShifter = () => {
     applyPitchShift()
   } catch (error) {
     console.error('Error initializing pitch shifter:', error)
-    // Fallback to playbackRate method
-    applyPitchShiftFallback()
+    // If pitch shifter fails, just apply speed normally (pitch changes won't work)
+    if (audioPlayer.value) {
+      audioPlayer.value.playbackRate = currentSpeed.value
+    }
   }
 }
 
@@ -256,23 +258,8 @@ const applyPitchShift = () => {
     if (pitchShifterNode.value.dry) {
       pitchShifterNode.value.dry.value = currentPitch.value === 0 ? 1 : 0
     }
-    return
   }
-
-  // Fallback: use playbackRate (changes both pitch and speed)
-  applyPitchShiftFallback()
-}
-
-// Fallback method using playbackRate (changes both pitch and speed)
-const applyPitchShiftFallback = () => {
-  if (!audioPlayer.value) return
-
-  if (currentPitch.value === 0) {
-    audioPlayer.value.playbackRate = currentSpeed.value
-  } else {
-    const pitchRatio = Math.pow(2, currentPitch.value / 12)
-    audioPlayer.value.playbackRate = currentSpeed.value * pitchRatio
-  }
+  // If pitch shifter is not available, only speed is applied (pitch changes won't work)
 }
 
 // Watch for pitch and speed changes and apply them

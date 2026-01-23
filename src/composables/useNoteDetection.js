@@ -124,15 +124,8 @@ export function useNoteDetection(audioPlayer, audioContext) {
       }
       sourceNode.value = audioContext.value.createMediaElementSource(audioPlayer.value)
       
-      // Connect through pitch shifter if available, otherwise directly to analyser
-      if (pitchShifterNode.value) {
-        // Source connects to pitch shifter input (which will be the delay nodes)
-        // Pitch shifter output connects to analyser
-        // Note: The actual connection to delay nodes happens in MusicPlayer
-        pitchShifterNode.value.connect(analyser.value)
-      } else {
-        sourceNode.value.connect(analyser.value)
-      }
+      // Connect source to analyser (pitch shifter connection is handled by setPitchShifterNode)
+      sourceNode.value.connect(analyser.value)
       analyser.value.connect(audioContext.value.destination)
       
       // Start note detection if playing
