@@ -6,8 +6,8 @@ import { ref, computed, onUnmounted } from 'vue'
 export function useMultiTrack() {
   const audioContext = ref(null)
   const audioBuffers = ref(new Map()) // Map<fileId, AudioBuffer>
-  const sourceNodes = ref(new Map()) // Map<fileId, AudioBufferSourceNode>
-  const gainNodes = ref(new Map()) // Map<fileId, GainNode>
+  const sourceNodes = ref(new Map()) // Map<blockId, AudioBufferSourceNode>
+  const gainNodes = ref(new Map()) // Map<trackId, GainNode>
   const masterGainNode = ref(null)
   const isPlaying = ref(false)
   const currentTime = ref(0)
@@ -52,7 +52,7 @@ export function useMultiTrack() {
   }
 
   // Create gain node for a track
-  const createGainNode = (fileId) => {
+  const createGainNode = (trackId) => {
     if (!audioContext.value) return null
     
     // Ensure master gain node exists
@@ -62,14 +62,14 @@ export function useMultiTrack() {
     
     const gainNode = audioContext.value.createGain()
     gainNode.gain.value = 1.0
-    gainNodes.value.set(fileId, gainNode)
+    gainNodes.value.set(trackId, gainNode)
     // Connect to master gain instead of destination
     gainNode.connect(masterGainNode.value)
     return gainNode
   }
 
   // Play a specific audio block
-  const playBlock = async (fileId, startTime = 0, offset = 0) => {
+  const playBlock = async (blockId, fileId, trackId, startTime = 0, offset = 0) => {
     await initAudioContext()
     
     const buffer = audioBuffers.value.get(fileId)
@@ -78,15 +78,16 @@ export function useMultiTrack() {
       return null
     }
 
-    // Stop existing source if any
-    stopBlock(fileId)
+    // Stop existing source for this block if any
+    stopBlock(blockId)
 
     const source = audioContext.value.createBufferSource()
     source.buffer = buffer
     
-    let gainNode = gainNodes.value.get(fileId)
+    // Get or create gain node for this track
+    let gainNode = gainNodes.value.get(trackId)
     if (!gainNode) {
-      gainNode = createGainNode(fileId)
+      gainNode = createGainNode(trackId)
     }
     
     source.connect(gainNode)
@@ -95,31 +96,31 @@ export function useMultiTrack() {
     const playTime = currentTimeInContext + startTime
     
     source.start(playTime, offset)
-    sourceNodes.value.set(fileId, source)
+    sourceNodes.value.set(blockId, source)
     
     source.onended = () => {
-      sourceNodes.value.delete(fileId)
+      sourceNodes.value.delete(blockId)
     }
     
     return source
   }
 
   // Stop a specific audio block
-  const stopBlock = (fileId) => {
-    const source = sourceNodes.value.get(fileId)
+  const stopBlock = (blockId) => {
+    const source = sourceNodes.value.get(blockId)
     if (source) {
       try {
         source.stop()
       } catch (e) {
         // Source might already be stopped
       }
-      sourceNodes.value.delete(fileId)
+      sourceNodes.value.delete(blockId)
     }
   }
 
   // Set volume for a track
-  const setVolume = (fileId, volume) => {
-    const gainNode = gainNodes.value.get(fileId)
+  const setVolume = (trackId, volume) => {
+    const gainNode = gainNodes.value.get(trackId)
     if (gainNode) {
       gainNode.gain.value = volume
     }
@@ -137,8 +138,8 @@ export function useMultiTrack() {
 
   // Stop all playing audio
   const stopAll = () => {
-    sourceNodes.value.forEach((source, fileId) => {
-      stopBlock(fileId)
+    sourceNodes.value.forEach((source, blockId) => {
+      stopBlock(blockId)
     })
     isPlaying.value = false
     currentTime.value = 0

@@ -11,14 +11,15 @@
       <div class="track-content" ref="trackContentRef">
         <AudioBlock
           v-for="block in blocks"
-          :key="block.fileId"
+          :key="block.blockId"
           :file="block.file"
           :fileId="block.fileId"
+          :blockId="block.blockId"
           :duration="block.duration"
           :startTime="block.startTime"
           :trackIndex="trackIndex"
           :pixelsPerSecond="pixelsPerSecond"
-          :isPlaying="playingBlocks.has(block.fileId)"
+          :isPlaying="playingBlocks.has(block.blockId)"
           :color="block.color"
           @drag-start="handleBlockDragStart"
           @drag-move="handleBlockDragMove"
@@ -187,6 +188,7 @@ const handleDrop = (event) => {
       // Check if this is a block being moved from another track
       if (blockData.type === 'block') {
         emit('drop-block', {
+          blockId: blockData.blockId,
           fileId: blockData.fileId,
           duration: blockData.duration,
           trackIndex: props.trackIndex,
@@ -236,10 +238,10 @@ const handleBlockDragEnd = (data) => {
   emit('block-drag-end', data)
 }
 
-const handleBlockDelete = (fileId) => {
+const handleBlockDelete = (blockId) => {
   emit('block-delete', {
     trackIndex: props.trackIndex,
-    fileId
+    blockId
   })
 }
 

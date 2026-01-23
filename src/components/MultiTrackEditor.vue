@@ -71,6 +71,22 @@
     <div class="tracks-section">
       <div class="tracks-container" ref="tracksContainerRef" @dragover.prevent="isDragging = true"
         @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
+        <!-- Time ruler -->
+        <div class="time-ruler-wrapper">
+          <div class="tracks-scroll-wrapper" ref="timeRulerScrollRef">
+            <div class="time-ruler" :style="{ width: `${maxTrackWidth}px` }" @click="handleTimeRulerClick">
+              <div 
+                v-for="marker in timeMarkers" 
+                :key="marker.time"
+                class="time-marker"
+                :style="{ left: `${marker.time * pixelsPerSecond}px` }"
+              >
+                <div class="time-tick"></div>
+                <div class="time-label">{{ formatTime(marker.time) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="tracks-scroll-wrapper" ref="tracksScrollWrapperRef">
           <div class="tracks-wrapper" :style="{ width: `${maxTrackWidth}px` }">
             <!-- Single playhead line spanning all tracks -->
@@ -103,6 +119,7 @@ import Track from './Track.vue'
 const fileInput = ref(null)
 const tracksContainerRef = ref(null)
 const tracksScrollWrapperRef = ref(null)
+const timeRulerScrollRef = ref(null)
 const isDragging = ref(false)
 const pixelsPerSecond = ref(50)
 const isDraggingPlayhead = ref(false)
@@ -110,7 +127,7 @@ const playheadDragStartTime = ref(0)
 
 // Track and block management
 const tracks = ref([])
-const blocks = ref([]) // { fileId, trackId, startTime, file, duration }
+const blocks = ref([]) // { blockId, fileId, trackId, startTime, file, duration, color }
 const uploadedFiles = ref([]) // { id, file, duration }
 
 // Playback state
@@ -137,9 +154,11 @@ const masterVolume = ref(100)
 // Generate unique IDs
 let trackIdCounter = 0
 let fileIdCounter = 0
+let blockIdCounter = 0
 
 const generateTrackId = () => `track-${trackIdCounter++}`
 const generateFileId = () => `file-${fileIdCounter++}`
+const generateBlockId = () => `block-${blockIdCounter++}`
 
 // Generate random color for library items
 const generateRandomColor = () => {
@@ -164,7 +183,7 @@ const getSummarizedName = (fileName) => {
   return nameWithoutExt
 }
 
-// Initialize with 3 tracks
+// Sync time ruler scroll with tracks scroll
 onMounted(() => {
   if (tracks.value.length === 0) {
     addTrack()
@@ -173,11 +192,66 @@ onMounted(() => {
   }
   // Initialize master volume
   setMasterVolume(masterVolume.value / 100)
+  
+  // Sync scroll between time ruler and tracks
+  const syncRulerToTracks = () => {
+    if (timeRulerScrollRef.value && tracksScrollWrapperRef.value) {
+      timeRulerScrollRef.value.scrollLeft = tracksScrollWrapperRef.value.scrollLeft
+    }
+  }
+  
+  const syncTracksToRuler = () => {
+    if (tracksScrollWrapperRef.value && timeRulerScrollRef.value) {
+      tracksScrollWrapperRef.value.scrollLeft = timeRulerScrollRef.value.scrollLeft
+    }
+  }
+  
+  // Listen to tracks scroll and sync to ruler
+  if (tracksScrollWrapperRef.value) {
+    tracksScrollWrapperRef.value.addEventListener('scroll', syncRulerToTracks)
+  }
+  
+  // Listen to ruler scroll and sync to tracks
+  if (timeRulerScrollRef.value) {
+    timeRulerScrollRef.value.addEventListener('scroll', syncTracksToRuler)
+  }
 })
 
 // Get blocks for a specific track
 const getBlocksForTrack = (trackId) => {
   return blocks.value.filter(block => block.trackId === trackId)
+}
+
+// Calculate time markers for the ruler
+const timeMarkers = computed(() => {
+  const markers = []
+  const maxTime = maxTrackWidth.value / pixelsPerSecond.value
+  const interval = Math.max(1, Math.floor(maxTime / 20)) // Show about 20 markers, minimum 1 second intervals
+  
+  for (let time = 0; time <= maxTime; time += interval) {
+    markers.push({ time: Math.round(time * 10) / 10 }) // Round to 1 decimal
+  }
+  return markers
+})
+
+// Handle time ruler click to seek
+const handleTimeRulerClick = (event) => {
+  const ruler = event.currentTarget
+  const rect = ruler.getBoundingClientRect()
+  const scrollWrapper = tracksScrollWrapperRef.value
+  if (!scrollWrapper) return
+  
+  const scrollLeft = scrollWrapper.scrollLeft
+  const x = (event.clientX - rect.left) + scrollLeft
+  const newTime = Math.max(0, x / pixelsPerSecond.value)
+  
+  // Pause if playing
+  if (isPlaying.value) {
+    pause()
+  }
+  
+  currentTime.value = newTime
+  playbackStartTime.value = newTime
 }
 
 // Calculate maximum track width based on all blocks
@@ -303,44 +377,40 @@ const handleLibraryDragStart = (event, file) => {
   }))
 }
 
-const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null, color = null }) => {
+const handleDropBlock = ({ blockId, fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null, color = null }) => {
   const track = tracks.value[trackIndex]
   if (!track) return
 
-  // Check if this is a block being moved from another track
-  if (sourceTrackIndex !== null && sourceTrackIndex !== trackIndex) {
-    // Find the block in the source track
-    const sourceTrack = tracks.value[sourceTrackIndex]
-    if (!sourceTrack) return
-
-    const existingBlock = blocks.value.find(b => b.fileId === fileId && b.trackId === sourceTrack.id)
+  // Check if this is a block being moved (either within same track or to another track)
+  if (blockId) {
+    const existingBlock = blocks.value.find(b => b.blockId === blockId)
     if (existingBlock) {
-      // Remove from source track
-      blocks.value = blocks.value.filter(b => !(b.fileId === fileId && b.trackId === sourceTrack.id))
-
-      // Add to new track with non-overlapping position
-      const startTime = findNonOverlappingPosition(track.id, dropTime, duration)
-      blocks.value.push({
-        fileId: existingBlock.fileId,
-        trackId: track.id,
-        startTime,
-        file: existingBlock.file,
-        duration: existingBlock.duration,
-        color: existingBlock.color // Preserve color when moving between tracks
-      })
+      // Block is being moved - check if it's moving to a different track
+      if (sourceTrackIndex !== null && sourceTrackIndex !== trackIndex) {
+        // Moving to a different track - remove from old track and add to new track
+        blocks.value = blocks.value.filter(b => b.blockId !== blockId)
+        
+        // Add to new track with non-overlapping position
+        const startTime = findNonOverlappingPosition(track.id, dropTime, duration)
+        blocks.value.push({
+          blockId: generateBlockId(), // New unique ID for this block instance
+          fileId: existingBlock.fileId,
+          trackId: track.id,
+          startTime,
+          file: existingBlock.file,
+          duration: existingBlock.duration,
+          color: existingBlock.color // Preserve color when moving between tracks
+        })
+      } else if (sourceTrackIndex === trackIndex || existingBlock.trackId === track.id) {
+        // Moving within the same track - just update position
+        const newStartTime = findNonOverlappingPosition(track.id, dropTime, existingBlock.duration, blockId)
+        existingBlock.startTime = Math.max(0, newStartTime)
+      }
       return
     }
   }
 
-  // Check if block already exists on this track
-  const existingBlock = blocks.value.find(b => b.fileId === fileId && b.trackId === track.id)
-  if (existingBlock) {
-    // Move existing block - validate position
-    const newStartTime = findNonOverlappingPosition(track.id, dropTime, duration, existingBlock.fileId)
-    existingBlock.startTime = newStartTime
-    return
-  }
-
+  // This is a new block from the library (not moving an existing block)
   // Find the uploaded file
   const uploadedFile = uploadedFiles.value.find(f => f.id === fileId)
   if (!uploadedFile) return
@@ -353,6 +423,7 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sou
   const blockColor = (color !== null && color !== undefined) ? color : uploadedFile.color
 
   blocks.value.push({
+    blockId: generateBlockId(), // Unique ID for each block instance
     fileId,
     trackId: track.id,
     startTime,
@@ -363,10 +434,10 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sou
 }
 
 // Helper function to find a non-overlapping position
-const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, excludeFileId = null) => {
+const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, excludeBlockId = null) => {
   // Get all blocks on this track (excluding the one being moved if applicable)
   const trackBlocks = blocks.value.filter(
-    b => b.trackId === trackId && b.fileId !== excludeFileId
+    b => b.trackId === trackId && (excludeBlockId === null || b.blockId !== excludeBlockId)
   )
 
   if (trackBlocks.length === 0) {
@@ -431,35 +502,36 @@ const findNonOverlappingPosition = (trackId, preferredTime, blockDuration, exclu
   return finalPosition
 }
 
-const handleBlockDragStart = ({ fileId }) => {
+const handleBlockDragStart = ({ blockId }) => {
   // Block drag started
 }
 
-const handleBlockDragMove = ({ fileId, newStartTime }) => {
-  const block = blocks.value.find(b => b.fileId === fileId)
+const handleBlockDragMove = ({ blockId, newStartTime }) => {
+  const block = blocks.value.find(b => b.blockId === blockId)
   if (block) {
     // Find non-overlapping position for the dragged block
     const validStartTime = findNonOverlappingPosition(
       block.trackId,
       newStartTime,
       block.duration,
-      fileId // Exclude the block being dragged
+      blockId // Exclude the block being dragged
     )
     block.startTime = Math.max(0, validStartTime)
   }
 }
 
-const handleBlockDragEnd = ({ fileId }) => {
+const handleBlockDragEnd = ({ blockId }) => {
   // Block drag ended
 }
 
-const handleBlockDelete = ({ trackIndex, fileId }) => {
+const handleBlockDelete = ({ trackIndex, blockId }) => {
   const track = tracks.value[trackIndex]
   if (track) {
-    blocks.value = blocks.value.filter(
-      block => !(block.fileId === fileId && block.trackId === track.id)
-    )
-    stopBlock(fileId)
+    const block = blocks.value.find(b => b.blockId === blockId && b.trackId === track.id)
+    if (block) {
+      blocks.value = blocks.value.filter(b => b.blockId !== blockId)
+      stopBlock(block.blockId) // Use blockId for audio playback
+    }
   }
 }
 
@@ -471,7 +543,7 @@ const handleVolumeChange = ({ trackIndex, volume }) => {
     // Update volume for all blocks in this track
     const trackBlocks = blocks.value.filter(b => b.trackId === track.id)
     trackBlocks.forEach(block => {
-      setVolume(block.fileId, track.isMuted ? 0 : volume)
+      setVolume(block.trackId, track.isMuted ? 0 : volume)
     })
   }
 }
@@ -482,7 +554,7 @@ const handleMuteToggle = ({ trackIndex, isMuted }) => {
     track.isMuted = isMuted
     const trackBlocks = blocks.value.filter(b => b.trackId === track.id)
     trackBlocks.forEach(block => {
-      setVolume(block.fileId, isMuted ? 0 : track.volume)
+      setVolume(block.trackId, isMuted ? 0 : track.volume)
     })
   }
 }
@@ -521,8 +593,8 @@ const play = async () => {
         try {
           const offset = Math.max(0, currentTime.value - blockStartTime)
           const delay = Math.max(0, blockStartTime - currentTime.value)
-          await playBlock(block.fileId, delay, offset)
-          playingBlocks.value.add(block.fileId)
+          await playBlock(block.blockId, block.fileId, block.trackId, delay, offset)
+          playingBlocks.value.add(block.blockId)
         } catch (error) {
           console.error('Error playing block:', error)
         }
@@ -558,8 +630,8 @@ const pause = () => {
     animationFrameId.value = null
   }
   // Note: Web Audio API doesn't support pause, so we stop and will resume from currentTime
-  playingBlocks.value.forEach(fileId => {
-    stopBlock(fileId)
+  playingBlocks.value.forEach(blockId => {
+    stopBlock(blockId)
   })
   playingBlocks.value.clear()
 }
@@ -906,6 +978,57 @@ watch(uploadedFiles, (newFiles) => {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+}
+
+.time-ruler-wrapper {
+  border-bottom: 2px solid #ddd;
+  background: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.time-ruler-wrapper .tracks-scroll-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.time-ruler-wrapper .tracks-scroll-wrapper::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.time-ruler {
+  position: relative;
+  height: 40px;
+  background: #f8f9fa;
+  cursor: pointer;
+  user-select: none;
+}
+
+.time-marker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.time-tick {
+  width: 1px;
+  height: 12px;
+  background: #999;
+  margin-top: 4px;
+}
+
+.time-label {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 2px;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .tracks-scroll-wrapper {

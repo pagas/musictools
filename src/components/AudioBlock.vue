@@ -37,6 +37,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  blockId: {
+    type: String,
+    required: true
+  },
   duration: {
     type: Number,
     required: true
@@ -123,6 +127,7 @@ const handleMouseDown = (event) => {
   dragStartTime.value = props.startTime
   
   emit('drag-start', {
+    blockId: props.blockId,
     fileId: props.fileId,
     trackIndex: props.trackIndex,
     startTime: props.startTime
@@ -142,7 +147,7 @@ const handleMouseDown = (event) => {
     const newStartTime = Math.max(0, dragStartTime.value + deltaTime)
     
     emit('drag-move', {
-      fileId: props.fileId,
+      blockId: props.blockId,
       newStartTime
     })
   }
@@ -151,7 +156,7 @@ const handleMouseDown = (event) => {
     if (isDragging.value) {
       isDragging.value = false
       emit('drag-end', {
-        fileId: props.fileId
+        blockId: props.blockId
       })
     }
     cleanupMouseListeners()
@@ -172,7 +177,7 @@ const handleDragStart = (event) => {
     isDragging.value = false
     cleanupMouseListeners()
     emit('drag-end', {
-      fileId: props.fileId
+      blockId: props.blockId
     })
   }
   
@@ -183,6 +188,7 @@ const handleDragStart = (event) => {
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('application/json', JSON.stringify({
     type: 'block',
+    blockId: props.blockId,
     fileId: props.fileId,
     trackIndex: props.trackIndex,
     startTime: props.startTime,
@@ -202,7 +208,7 @@ const handleDragEnd = () => {
 }
 
 const handleDelete = () => {
-  emit('delete', props.fileId)
+  emit('delete', props.blockId)
 }
 </script>
 
