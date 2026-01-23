@@ -32,10 +32,10 @@
       </div>
     </div>
 
-    <div class="file-library" v-if="uploadedFiles.length > 0">
+    <div class="file-library">
       <div class="library-header">
         <h3>Audio Library</h3>
-        <button class="btn-upload-more" @click="triggerFileInput" title="Upload more files">
+        <button class="btn-upload-more" @click="triggerFileInput" title="Upload files">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -43,20 +43,24 @@
           Add Files
         </button>
       </div>
-      <div class="library-grid">
+      <div class="library-grid" v-if="uploadedFiles.length > 0">
         <div
           v-for="file in uploadedFiles"
           :key="file.id"
           class="library-item"
+          :style="{ backgroundColor: file.color }"
           draggable="true"
           @dragstart="handleLibraryDragStart($event, file)"
         >
           <div class="library-item-icon">🎵</div>
           <div class="library-item-info">
-            <div class="library-item-name">{{ file.name }}</div>
+            <div class="library-item-name">{{ getSummarizedName(file.file?.name || 'Unknown file') }}</div>
             <div class="library-item-duration">{{ formatTime(file.duration) }}</div>
           </div>
         </div>
+      </div>
+      <div v-else class="library-empty">
+        <p>No files uploaded yet. Click "Add Files" to get started.</p>
       </div>
     </div>
 
@@ -70,7 +74,13 @@
       @change="handleFileSelect"
     />
 
-    <div class="tracks-container" ref="tracksContainerRef">
+    <div 
+      class="tracks-container" 
+      ref="tracksContainerRef"
+      @dragover.prevent="isDragging = true"
+      @dragleave.prevent="isDragging = false"
+      @drop.prevent="handleDrop"
+    >
       <Track
         v-for="(track, index) in tracks"
         :key="track.id"
@@ -89,27 +99,6 @@
         @volume-change="handleVolumeChange"
         @mute-toggle="handleMuteToggle"
       />
-    </div>
-
-    <div class="upload-section" v-if="uploadedFiles.length === 0">
-      <div
-        class="upload-area"
-        :class="{ dragover: isDragging }"
-        @click="triggerFileInput"
-        @dragover.prevent="isDragging = true"
-        @dragleave.prevent="isDragging = false"
-        @drop.prevent="handleDrop"
-      >
-        <div class="upload-content">
-          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-          </svg>
-          <p class="upload-text">Click to upload multiple audio files</p>
-          <p class="upload-hint">Supported formats: MP3, WAV, OGG, M4A</p>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -153,6 +142,29 @@ let fileIdCounter = 0
 
 const generateTrackId = () => `track-${trackIdCounter++}`
 const generateFileId = () => `file-${fileIdCounter++}`
+
+// Generate random color for library items
+const generateRandomColor = () => {
+  const colors = [
+    '#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe',
+    '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#a8edea',
+    '#fed6e3', '#ffecd2', '#fcb69f', '#ff9a9e', '#a8caba',
+    '#fbc2eb', '#5d4e75', '#8e9aaf', '#cbc0d3', '#d4a5a5'
+  ]
+  return colors[Math.floor(Math.random() * colors.length)]
+}
+
+// Summarize file name (remove extension, truncate if too long)
+const getSummarizedName = (fileName) => {
+  if (!fileName) return 'Unknown file'
+  // Remove file extension
+  const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '')
+  // Truncate if longer than 25 characters
+  if (nameWithoutExt.length > 25) {
+    return nameWithoutExt.substring(0, 22) + '...'
+  }
+  return nameWithoutExt
+}
 
 // Initialize with one track
 onMounted(() => {
@@ -217,7 +229,8 @@ const processFiles = async (files) => {
           uploadedFiles.value.push({
             id: fileId,
             file,
-            duration: audio.duration || 0
+            duration: audio.duration || 0,
+            color: generateRandomColor()
           })
           
           // Load into audio buffer
@@ -722,16 +735,17 @@ watch(uploadedFiles, (newFiles) => {
   gap: 12px;
   padding: 12px;
   background: #f0f2ff;
-  border: 2px solid #e0e0e0;
+  border: 2px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   cursor: grab;
   transition: all 0.2s ease;
 }
 
 .library-item:hover {
-  border-color: #667eea;
+  border-color: rgba(0, 0, 0, 0.2);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.05);
 }
 
 .library-item:active {
@@ -740,6 +754,7 @@ watch(uploadedFiles, (newFiles) => {
 
 .library-item-icon {
   font-size: 2em;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 .library-item-info {
@@ -754,69 +769,26 @@ watch(uploadedFiles, (newFiles) => {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 0.9em;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9);
 }
 
 .library-item-duration {
   font-size: 0.8em;
-  color: #666;
+  color: #555;
   margin-top: 4px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
+}
+
+.library-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #666;
+  font-size: 0.95em;
 }
 
 .tracks-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-.upload-section {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  min-height: 400px;
-}
-
-.upload-area {
-  border: 3px dashed #667eea;
-  border-radius: 15px;
-  padding: 60px 40px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: white;
-  max-width: 500px;
-  width: 100%;
-}
-
-.upload-area:hover {
-  background: #f0f2ff;
-  border-color: #764ba2;
-  transform: translateY(-2px);
-}
-
-.upload-area.dragover {
-  background: #e8ebff;
-  border-color: #764ba2;
-  transform: scale(1.02);
-}
-
-.upload-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 20px;
-  color: #667eea;
-}
-
-.upload-text {
-  font-size: 1.3em;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.upload-hint {
-  color: #666;
-  font-size: 0.9em;
 }
 </style>
