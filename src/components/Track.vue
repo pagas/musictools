@@ -8,6 +8,11 @@
   >
     <div class="track-wrapper">
       <div class="track-content" ref="trackContentRef">
+        <!-- Playhead line -->
+        <div 
+          class="playhead-line" 
+          :style="{ left: `${playheadPosition}px` }"
+        ></div>
         <AudioBlock
           v-for="block in blocks"
           :key="block.fileId"
@@ -92,6 +97,10 @@ const props = defineProps({
   playingBlocks: {
     type: Set,
     default: () => new Set()
+  },
+  currentTime: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -103,11 +112,22 @@ const trackName = ref(props.name || `Track ${props.trackIndex + 1}`)
 const volume = ref(100)
 const isMuted = ref(false)
 
+// Computed property for playhead position
+const playheadPosition = computed(() => {
+  const position = props.currentTime * props.pixelsPerSecond
+  return Math.max(0, position) // Ensure position is never negative
+})
+
 watch(() => props.name, (newName) => {
   if (newName) {
     trackName.value = newName
   }
 })
+
+// Debug: Watch currentTime changes (can be removed later)
+watch(() => props.currentTime, (newTime) => {
+  console.log('Track currentTime updated:', newTime, 'Position:', playheadPosition.value)
+}, { immediate: true })
 
 const handleDrop = (event) => {
   isActive.value = false
@@ -307,6 +327,31 @@ const toggleMute = () => {
     #e0e0e0 49px,
     #e0e0e0 50px
   );
+}
+
+.playhead-line {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background: #ff4444;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(255, 68, 68, 0.6);
+  transform: translateX(-1px);
+  will-change: left;
+}
+
+.playhead-line::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 8px solid #ff4444;
 }
 
 .track-content::-webkit-scrollbar {

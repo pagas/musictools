@@ -68,11 +68,11 @@
     </div>
 
     <div class="tracks-section">
-
       <div class="tracks-container" ref="tracksContainerRef" @dragover.prevent="isDragging = true"
         @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
         <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
           :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
+          :currentTime="currentTime"
           @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
           @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
           @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
