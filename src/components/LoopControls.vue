@@ -403,8 +403,33 @@ defineEmits([
 
   .time-input {
     min-width: 140px;
-    padding: 6px 90px 6px 10px;
+    padding: 12px 90px 12px 10px;
     font-size: 0.9em;
+    min-height: 44px;
+  }
+
+  .time-input-buttons {
+    right: 4px;
+  }
+
+  .time-btn {
+    width: 28px;
+    height: 24px;
+  }
+
+  .time-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .time-btn-ms {
+    width: 28px;
+    height: 24px;
+  }
+
+  .time-btn-ms svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
@@ -436,32 +461,33 @@ defineEmits([
 
   .time-input {
     min-width: 120px;
-    padding: 6px 80px 6px 8px;
+    padding: 14px 80px 14px 8px;
     font-size: 0.85em;
+    min-height: 48px;
   }
 
   .time-input-buttons {
-    right: 2px;
+    right: 4px;
   }
 
   .time-btn {
-    width: 22px;
-    height: 18px;
+    width: 30px;
+    height: 26px;
   }
 
   .time-btn svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  .time-btn-ms {
-    width: 22px;
+    width: 18px;
     height: 18px;
   }
 
+  .time-btn-ms {
+    width: 30px;
+    height: 26px;
+  }
+
   .time-btn-ms svg {
-    width: 12px;
-    height: 12px;
+    width: 18px;
+    height: 18px;
   }
 }
 </style>
