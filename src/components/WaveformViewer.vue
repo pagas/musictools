@@ -11,59 +11,6 @@
         @mouseleave="handleCanvasMouseUpWrapper"
         @touchstart="handleCanvasMouseDownSelection"
       ></canvas>
-      <div class="zoom-controls">
-        <button 
-          class="zoom-btn" 
-          @click="zoomOut"
-          :disabled="zoomLevel <= 1"
-          title="Zoom Out"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            <line x1="8" y1="11" x2="14" y2="11"></line>
-          </svg>
-        </button>
-        <span class="zoom-level">{{ zoomLevel.toFixed(1) }}x</span>
-        <button 
-          class="zoom-btn" 
-          @click="zoomIn"
-          :disabled="zoomLevel >= 10"
-          title="Zoom In"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            <line x1="11" y1="8" x2="11" y2="14"></line>
-            <line x1="8" y1="11" x2="14" y2="11"></line>
-          </svg>
-        </button>
-        <button 
-          class="zoom-btn zoom-reset" 
-          @click="resetZoom"
-          :disabled="zoomLevel === 1 && zoomOffset === 0"
-          title="Reset Zoom"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-            <path d="M21 3v5h-5"></path>
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-            <path d="M3 21v-5h5"></path>
-          </svg>
-        </button>
-        <button 
-          class="zoom-btn zoom-fit" 
-          @click="zoomToLoop"
-          :disabled="loopStart === null || loopEnd === null"
-          title="Zoom to Loop"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <path d="M8 12h8"></path>
-            <path d="M12 8v8"></path>
-          </svg>
-        </button>
-      </div>
       <!-- Drag selection overlay -->
       <div 
         v-if="isDraggingSelection"
@@ -100,10 +47,6 @@
         ></div>
       </div>
     </div>
-    <div class="loop-info" v-if="loopStart !== null || loopEnd !== null">
-      <span v-if="loopStart !== null">Start: {{ formatTime(loopStart) }}</span>
-      <span v-if="loopEnd !== null">End: {{ formatTime(loopEnd) }}</span>
-    </div>
     <!-- Scrollbar for zoomed view -->
     <input
       v-if="zoomLevel > 1 && duration > 0"
@@ -115,6 +58,60 @@
       @input="handleScrollbarInput"
       :title="`Scroll: ${formatTime(visibleStartTime)} - ${formatTime(visibleEndTime)}`"
     />
+    <!-- Zoom controls (below scrollbar) -->
+    <div class="zoom-controls">
+      <button 
+        class="zoom-btn" 
+        @click="zoomOut"
+        :disabled="zoomLevel <= 1"
+        title="Zoom Out"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+      </button>
+      <span class="zoom-level">{{ zoomLevel.toFixed(1) }}x</span>
+      <button 
+        class="zoom-btn" 
+        @click="zoomIn"
+        :disabled="zoomLevel >= 10"
+        title="Zoom In"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <line x1="11" y1="8" x2="11" y2="14"></line>
+          <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+      </button>
+      <button 
+        class="zoom-btn zoom-reset" 
+        @click="resetZoom"
+        :disabled="zoomLevel === 1 && zoomOffset === 0"
+        title="Reset Zoom"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+          <path d="M21 3v5h-5"></path>
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+          <path d="M3 21v-5h5"></path>
+        </svg>
+      </button>
+      <button 
+        class="zoom-btn zoom-fit" 
+        @click="zoomToLoop"
+        :disabled="loopStart === null || loopEnd === null"
+        title="Zoom to Loop"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <path d="M8 12h8"></path>
+          <path d="M12 8v8"></path>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -649,7 +646,8 @@ onUnmounted(() => {
 
 <style scoped>
 .progress-container {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .progress-wrapper {
@@ -660,17 +658,16 @@ onUnmounted(() => {
 }
 
 .zoom-controls {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   background: rgba(255, 255, 255, 0.95);
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
+  margin-left: auto;
+  width: fit-content;
+  align-self: flex-end;
 }
 
 .zoom-btn {
@@ -830,21 +827,11 @@ onUnmounted(() => {
   transition: none;
 }
 
-.loop-info {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 0.85em;
-  color: #667eea;
-  font-weight: 600;
-}
-
 .zoom-scrollbar {
   width: 100%;
   height: 8px;
-  margin-top: 8px;
-  margin-bottom: 10px;
   border-radius: 4px;
+  margin-bottom: 10px;
   background: #e0e0e0;
   outline: none;
   -webkit-appearance: none;
