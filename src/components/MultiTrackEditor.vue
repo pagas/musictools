@@ -166,9 +166,11 @@ const getSummarizedName = (fileName) => {
   return nameWithoutExt
 }
 
-// Initialize with one track
+// Initialize with 3 tracks
 onMounted(() => {
   if (tracks.value.length === 0) {
+    addTrack()
+    addTrack()
     addTrack()
   }
 })

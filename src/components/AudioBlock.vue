@@ -69,6 +69,10 @@ const isDragging = ref(false)
 const dragStartX = ref(0)
 const dragStartTime = ref(0)
 const isHtml5Dragging = ref(false)
+let mouseMoveHandler = null
+let mouseUpHandler = null
+let touchMoveHandler = null
+let touchEndHandler = null
 
 const blockStyle = computed(() => {
   const width = props.duration * props.pixelsPerSecond
@@ -88,9 +92,31 @@ const formatDuration = (seconds) => {
   return formatTime(seconds)
 }
 
+const cleanupMouseListeners = () => {
+  if (mouseMoveHandler) {
+    document.removeEventListener('mousemove', mouseMoveHandler)
+    mouseMoveHandler = null
+  }
+  if (mouseUpHandler) {
+    document.removeEventListener('mouseup', mouseUpHandler)
+    mouseUpHandler = null
+  }
+  if (touchMoveHandler) {
+    document.removeEventListener('touchmove', touchMoveHandler)
+    touchMoveHandler = null
+  }
+  if (touchEndHandler) {
+    document.removeEventListener('touchend', touchEndHandler)
+    touchEndHandler = null
+  }
+}
+
 const handleMouseDown = (event) => {
   // Don't start mouse-based dragging if HTML5 drag is active
   if (isHtml5Dragging.value) return
+  
+  // Clean up any existing listeners first
+  cleanupMouseListeners()
   
   isDragging.value = true
   dragStartX.value = event.clientX || event.touches[0].clientX
@@ -102,10 +128,13 @@ const handleMouseDown = (event) => {
     startTime: props.startTime
   })
 
-  const handleMouseMove = (moveEvent) => {
-    if (!isDragging.value || isHtml5Dragging.value) return
+  mouseMoveHandler = (moveEvent) => {
+    if (!isDragging.value || isHtml5Dragging.value) {
+      cleanupMouseListeners()
+      return
+    }
     
-    const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX)
+    const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0]?.clientX)
     if (currentX === undefined) return
     
     const deltaX = currentX - dragStartX.value
@@ -118,27 +147,35 @@ const handleMouseDown = (event) => {
     })
   }
 
-  const handleMouseUp = () => {
+  mouseUpHandler = () => {
     if (isDragging.value) {
       isDragging.value = false
       emit('drag-end', {
         fileId: props.fileId
       })
     }
-    
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-    document.removeEventListener('touchmove', handleMouseMove)
-    document.removeEventListener('touchend', handleMouseUp)
+    cleanupMouseListeners()
   }
 
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-  document.addEventListener('touchmove', handleMouseMove)
-  document.addEventListener('touchend', handleMouseUp)
+  touchMoveHandler = mouseMoveHandler
+  touchEndHandler = mouseUpHandler
+
+  document.addEventListener('mousemove', mouseMoveHandler)
+  document.addEventListener('mouseup', mouseUpHandler)
+  document.addEventListener('touchmove', touchMoveHandler)
+  document.addEventListener('touchend', touchEndHandler)
 }
 
 const handleDragStart = (event) => {
+  // Stop mouse-based dragging if active
+  if (isDragging.value) {
+    isDragging.value = false
+    cleanupMouseListeners()
+    emit('drag-end', {
+      fileId: props.fileId
+    })
+  }
+  
   // Mark that HTML5 drag is starting
   isHtml5Dragging.value = true
   
@@ -157,6 +194,11 @@ const handleDragStart = (event) => {
 const handleDragEnd = () => {
   // Reset flag when drag ends
   isHtml5Dragging.value = false
+  // Also ensure mouse dragging is stopped
+  if (isDragging.value) {
+    isDragging.value = false
+    cleanupMouseListeners()
+  }
 }
 
 const handleDelete = () => {
