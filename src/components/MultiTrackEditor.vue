@@ -70,9 +70,16 @@
     <div class="tracks-section">
       <div class="tracks-container" ref="tracksContainerRef" @dragover.prevent="isDragging = true"
         @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
+        <!-- Single playhead line spanning all tracks -->
+        <div 
+          class="playhead-line" 
+          :style="{ left: `${currentTime * pixelsPerSecond}px` }"
+          v-if="tracks.length > 0"
+          @mousedown="handlePlayheadDragStart"
+          @touchstart="handlePlayheadDragStart"
+        ></div>
         <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
           :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
-          :currentTime="currentTime"
           @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
           @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
           @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
@@ -92,6 +99,8 @@ const fileInput = ref(null)
 const tracksContainerRef = ref(null)
 const isDragging = ref(false)
 const pixelsPerSecond = ref(50)
+const isDraggingPlayhead = ref(false)
+const playheadDragStartTime = ref(0)
 
 // Track and block management
 const tracks = ref([])
@@ -547,6 +556,59 @@ const stop = () => {
   stopAll()
 }
 
+// Playhead dragging
+const handlePlayheadDragStart = (event) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  isDraggingPlayhead.value = true
+  playheadDragStartTime.value = currentTime.value
+  
+  // Pause playback if playing
+  if (isPlaying.value) {
+    pause()
+  }
+  
+  const handleMove = (e) => {
+    if (!isDraggingPlayhead.value) return
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Get the first track's content area for coordinate calculation
+    const container = tracksContainerRef.value
+    if (!container) return
+    
+    // Find the first track element
+    const firstTrack = container.querySelector('.track')
+    if (!firstTrack) return
+    
+    const trackContent = firstTrack.querySelector('.track-content')
+    if (!trackContent) return
+    
+    const rect = trackContent.getBoundingClientRect()
+    const scrollLeft = trackContent.scrollLeft
+    const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX
+    const x = (clientX - rect.left) + scrollLeft
+    const newTime = Math.max(0, x / pixelsPerSecond.value)
+    
+    currentTime.value = newTime
+    playbackStartTime.value = newTime
+  }
+  
+  const handleEnd = () => {
+    isDraggingPlayhead.value = false
+    document.removeEventListener('mousemove', handleMove)
+    document.removeEventListener('mouseup', handleEnd)
+    document.removeEventListener('touchmove', handleMove)
+    document.removeEventListener('touchend', handleEnd)
+  }
+  
+  document.addEventListener('mousemove', handleMove)
+  document.addEventListener('mouseup', handleEnd)
+  document.addEventListener('touchmove', handleMove, { passive: false })
+  document.addEventListener('touchend', handleEnd)
+}
+
 // Cleanup
 onUnmounted(() => {
   if (animationFrameId.value) {
@@ -833,5 +895,51 @@ watch(uploadedFiles, (newFiles) => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
+}
+
+.playhead-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  margin-left: -4px;
+  background: transparent;
+  z-index: 1001;
+  pointer-events: auto;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.playhead-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100%;
+  background: #ff4444;
+  box-shadow: 0 0 4px rgba(255, 68, 68, 0.6);
+}
+
+.playhead-line:hover::after {
+  width: 3px;
+  background: #ff6666;
+}
+
+.playhead-line::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 8px solid #ff4444;
+  z-index: 1;
 }
 </style>
