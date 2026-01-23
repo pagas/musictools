@@ -71,20 +71,24 @@
     <div class="tracks-section">
       <div class="tracks-container" ref="tracksContainerRef" @dragover.prevent="isDragging = true"
         @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
-        <!-- Single playhead line spanning all tracks -->
-        <div 
-          class="playhead-line" 
-          :style="{ left: `${currentTime * pixelsPerSecond}px` }"
-          v-if="tracks.length > 0"
-          @mousedown="handlePlayheadDragStart"
-          @touchstart="handlePlayheadDragStart"
-        ></div>
-        <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
-          :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
-          @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
-          @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
-          @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
-          @mute-toggle="handleMuteToggle" />
+        <div class="tracks-scroll-wrapper" ref="tracksScrollWrapperRef">
+          <div class="tracks-wrapper" :style="{ width: `${maxTrackWidth}px` }">
+            <!-- Single playhead line spanning all tracks -->
+            <div 
+              class="playhead-line" 
+              :style="{ left: `${currentTime * pixelsPerSecond}px` }"
+              v-if="tracks.length > 0"
+              @mousedown="handlePlayheadDragStart"
+              @touchstart="handlePlayheadDragStart"
+            ></div>
+            <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
+              :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
+              @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
+              @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
+              @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
+              @mute-toggle="handleMuteToggle" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -98,6 +102,7 @@ import Track from './Track.vue'
 
 const fileInput = ref(null)
 const tracksContainerRef = ref(null)
+const tracksScrollWrapperRef = ref(null)
 const isDragging = ref(false)
 const pixelsPerSecond = ref(50)
 const isDraggingPlayhead = ref(false)
@@ -174,6 +179,15 @@ onMounted(() => {
 const getBlocksForTrack = (trackId) => {
   return blocks.value.filter(block => block.trackId === trackId)
 }
+
+// Calculate maximum track width based on all blocks
+const maxTrackWidth = computed(() => {
+  if (blocks.value.length === 0) {
+    return Math.max(1000, pixelsPerSecond.value * 10) // Default minimum width
+  }
+  const maxEndTime = Math.max(...blocks.value.map(block => block.startTime + block.duration))
+  return Math.max(maxEndTime * pixelsPerSecond.value + 200, 1000) // Add padding and minimum width
+})
 
 // File upload handlers
 const triggerFileInput = () => {
@@ -582,19 +596,12 @@ const handlePlayheadDragStart = (event) => {
     e.preventDefault()
     e.stopPropagation()
     
-    // Get the first track's content area for coordinate calculation
-    const container = tracksContainerRef.value
-    if (!container) return
+    // Get the scroll wrapper for coordinate calculation
+    const scrollWrapper = tracksScrollWrapperRef.value
+    if (!scrollWrapper) return
     
-    // Find the first track element
-    const firstTrack = container.querySelector('.track')
-    if (!firstTrack) return
-    
-    const trackContent = firstTrack.querySelector('.track-content')
-    if (!trackContent) return
-    
-    const rect = trackContent.getBoundingClientRect()
-    const scrollLeft = trackContent.scrollLeft
+    const rect = scrollWrapper.getBoundingClientRect()
+    const scrollLeft = scrollWrapper.scrollLeft
     const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX
     const x = (clientX - rect.left) + scrollLeft
     const newTime = Math.max(0, x / pixelsPerSecond.value)
@@ -901,7 +908,35 @@ watch(uploadedFiles, (newFiles) => {
   position: relative;
 }
 
-.playhead-line {
+.tracks-scroll-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+
+.tracks-scroll-wrapper::-webkit-scrollbar {
+  height: 12px;
+}
+
+.tracks-scroll-wrapper::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+.tracks-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 6px;
+}
+
+.tracks-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #5568d3;
+}
+
+.tracks-wrapper {
+  position: relative;
+  min-height: 100%;
+}
+
+.tracks-wrapper .playhead-line {
   position: absolute;
   top: 0;
   bottom: 0;

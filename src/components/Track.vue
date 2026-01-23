@@ -310,20 +310,4 @@ const toggleMute = () => {
 }
 
 
-.track-content::-webkit-scrollbar {
-  height: 8px;
-}
-
-.track-content::-webkit-scrollbar-track {
-  background: #f0f0f0;
-}
-
-.track-content::-webkit-scrollbar-thumb {
-  background: #667eea;
-  border-radius: 4px;
-}
-
-.track-content::-webkit-scrollbar-thumb:hover {
-  background: #5568d3;
-}
 </style>
