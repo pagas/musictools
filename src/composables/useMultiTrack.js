@@ -1,0 +1,152 @@
+import { ref, computed, onUnmounted } from 'vue'
+
+/**
+ * Composable for managing multi-track audio playback
+ */
+export function useMultiTrack() {
+  const audioContext = ref(null)
+  const audioBuffers = ref(new Map()) // Map<fileId, AudioBuffer>
+  const sourceNodes = ref(new Map()) // Map<fileId, AudioBufferSourceNode>
+  const gainNodes = ref(new Map()) // Map<fileId, GainNode>
+  const isPlaying = ref(false)
+  const currentTime = ref(0)
+  const playbackStartTime = ref(0)
+  const animationFrameId = ref(null)
+
+  // Initialize audio context
+  const initAudioContext = async () => {
+    if (!audioContext.value) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      audioContext.value = new AudioContextClass()
+    }
+    if (audioContext.value.state === 'suspended') {
+      await audioContext.value.resume()
+    }
+  }
+
+  // Load audio file into buffer
+  const loadAudioFile = async (file, fileId) => {
+    await initAudioContext()
+    
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const audioBuffer = await audioContext.value.decodeAudioData(arrayBuffer)
+      audioBuffers.value.set(fileId, audioBuffer)
+      return audioBuffer
+    } catch (error) {
+      console.error('Error loading audio file:', error)
+      throw error
+    }
+  }
+
+  // Create gain node for a track
+  const createGainNode = (fileId) => {
+    if (!audioContext.value) return null
+    
+    const gainNode = audioContext.value.createGain()
+    gainNode.gain.value = 1.0
+    gainNodes.value.set(fileId, gainNode)
+    gainNode.connect(audioContext.value.destination)
+    return gainNode
+  }
+
+  // Play a specific audio block
+  const playBlock = async (fileId, startTime = 0, offset = 0) => {
+    await initAudioContext()
+    
+    const buffer = audioBuffers.value.get(fileId)
+    if (!buffer) {
+      console.warn(`Audio buffer not found for fileId: ${fileId}`)
+      return null
+    }
+
+    // Stop existing source if any
+    stopBlock(fileId)
+
+    const source = audioContext.value.createBufferSource()
+    source.buffer = buffer
+    
+    let gainNode = gainNodes.value.get(fileId)
+    if (!gainNode) {
+      gainNode = createGainNode(fileId)
+    }
+    
+    source.connect(gainNode)
+    
+    const currentTimeInContext = audioContext.value.currentTime
+    const playTime = currentTimeInContext + startTime
+    
+    source.start(playTime, offset)
+    sourceNodes.value.set(fileId, source)
+    
+    source.onended = () => {
+      sourceNodes.value.delete(fileId)
+    }
+    
+    return source
+  }
+
+  // Stop a specific audio block
+  const stopBlock = (fileId) => {
+    const source = sourceNodes.value.get(fileId)
+    if (source) {
+      try {
+        source.stop()
+      } catch (e) {
+        // Source might already be stopped
+      }
+      sourceNodes.value.delete(fileId)
+    }
+  }
+
+  // Set volume for a track
+  const setVolume = (fileId, volume) => {
+    const gainNode = gainNodes.value.get(fileId)
+    if (gainNode) {
+      gainNode.gain.value = volume
+    }
+  }
+
+  // Stop all playing audio
+  const stopAll = () => {
+    sourceNodes.value.forEach((source, fileId) => {
+      stopBlock(fileId)
+    })
+    isPlaying.value = false
+    currentTime.value = 0
+    if (animationFrameId.value) {
+      cancelAnimationFrame(animationFrameId.value)
+      animationFrameId.value = null
+    }
+  }
+
+  // Cleanup
+  const cleanup = () => {
+    stopAll()
+    audioBuffers.value.clear()
+    sourceNodes.value.clear()
+    gainNodes.value.clear()
+    if (audioContext.value) {
+      audioContext.value.close().catch(() => {})
+      audioContext.value = null
+    }
+  }
+
+  onUnmounted(() => {
+    cleanup()
+  })
+
+  return {
+    audioContext,
+    audioBuffers,
+    isPlaying,
+    currentTime,
+    initAudioContext,
+    loadAudioFile,
+    playBlock,
+    stopBlock,
+    setVolume,
+    stopAll,
+    cleanup
+  }
+}

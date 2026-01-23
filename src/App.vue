@@ -5,11 +5,12 @@
       <p class="subtitle">Upload and analyze or slow down your music</p>
     </header>
 
-    <nav v-if="currentFile" class="tabs">
+    <nav class="tabs">
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'slowdowner' }"
         @click="activeTab = 'slowdowner'"
+        :disabled="!currentFile"
       >
         🎚️ Slow Downer
       </button>
@@ -17,18 +18,26 @@
         class="tab-btn" 
         :class="{ active: activeTab === 'analyzer' }"
         @click="activeTab = 'analyzer'"
+        :disabled="!currentFile"
       >
         🔍 Music Analyzer
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'multitrack' }"
+        @click="activeTab = 'multitrack'"
+      >
+        🎛️ Multi-Track Editor
       </button>
     </nav>
 
     <main>
       <FileUpload
-        v-if="!currentFile"
+        v-if="!currentFile && activeTab !== 'multitrack'"
         @file-selected="handleFileSelected"
       />
       
-      <div v-else class="file-info">
+      <div v-if="currentFile && activeTab !== 'multitrack'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <button class="btn-change" @click="changeFile">Change File</button>
       </div>
@@ -42,6 +51,10 @@
         v-if="currentFile && activeTab === 'analyzer'"
         :file="currentFile"
       />
+
+      <MultiTrackEditor
+        v-if="activeTab === 'multitrack'"
+      />
     </main>
   </div>
 </template>
@@ -51,6 +64,7 @@ import { ref } from 'vue'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
 import MusicAnalyzer from './components/MusicAnalyzer.vue'
+import MultiTrackEditor from './components/MultiTrackEditor.vue'
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
@@ -94,6 +108,7 @@ header h1 {
 
 main {
   padding: 40px;
+  min-height: 400px;
 }
 
 .file-info {
@@ -165,6 +180,17 @@ main {
   color: #667eea;
   border-bottom-color: #667eea;
   background: white;
+}
+
+.tab-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.multitrack-wrapper {
+  padding: 0;
+  margin: -40px;
+  min-height: 600px;
 }
 
 /* Mobile responsive styles */
