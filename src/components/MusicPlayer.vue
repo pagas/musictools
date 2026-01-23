@@ -61,6 +61,10 @@
         <div class="speed-controls-row">
           <SpeedControls :currentSpeed="currentSpeed" :speedOptions="speedOptions" @setSpeed="setPlaybackSpeed" />
         </div>
+
+        <div class="pitch-controls-row">
+          <PitchControls :currentPitch="currentPitch" :pitchOptions="pitchOptions" @setPitch="setPitch" />
+        </div>
       </div>
     </div>
   </div>
@@ -71,10 +75,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAudio } from '../composables/useAudio'
 import { useLoop } from '../composables/useLoop'
 import { useNoteDetection } from '../composables/useNoteDetection'
+import createPitchShifter from 'soundbank-pitch-shift'
 import PlaybackControls from './PlaybackControls.vue'
 import NoteDetector from './NoteDetector.vue'
 import VolumeControl from './VolumeControl.vue'
 import SpeedControls from './SpeedControls.vue'
+import PitchControls from './PitchControls.vue'
 import WaveformViewer from './WaveformViewer.vue'
 import LoopControls from './LoopControls.vue'
 
@@ -96,9 +102,11 @@ const {
   duration,
   volume,
   currentSpeed,
+  currentPitch,
   audioUrl,
   togglePlayPause: togglePlayPauseBase,
   setPlaybackSpeed,
+  setPitch,
   updateVolume,
   seek,
   handleLoadedMetadata: handleLoadedMetadataBase,
@@ -133,7 +141,7 @@ const {
   decrementLoopEndMs
 } = useLoop(audioPlayer, computed(() => duration.value))
 
-// Initialize audio context for note detection
+// Initialize audio context for note detection and pitch shifting
 const audioContext = ref(null)
 
 // Use note detection composable
@@ -144,11 +152,19 @@ const {
   setupAudioAnalysis,
   startNoteDetection,
   stopNoteDetection,
-  cleanup: cleanupNoteDetection
+  cleanup: cleanupNoteDetection,
+  getSourceNode,
+  setPitchShifterNode
 } = useNoteDetection(audioPlayer, audioContext)
+
+// Pitch shifter using soundbank-pitch-shift
+const pitchShifterNode = ref(null)
 
 // Speed options
 const speedOptions = [0.25, 0.5, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2]
+
+// Pitch options (in semitones)
+const pitchOptions = [-12, -6, -3, -2, -1, 0, 1, 2, 3, 6, 12]
 
 // Repeat track state (for whole track, not loop)
 const repeatTrack = ref(false)
@@ -164,6 +180,12 @@ const initAudioContext = () => {
     // Set up analyser for real-time note detection
     setupAudioAnalysis()
 
+    // Initialize pitch shifter after source node is created
+    // Wait a bit for setupAudioAnalysis to complete
+    setTimeout(() => {
+      initPitchShifter()
+    }, 200)
+
     // Start note detection if playing
     if (!audioPlayer.value.paused) {
       if (audioContext.value.state === 'suspended') {
@@ -175,6 +197,88 @@ const initAudioContext = () => {
     console.error('Error initializing audio context:', error)
   }
 }
+
+// Initialize pitch shifter using soundbank-pitch-shift
+const initPitchShifter = () => {
+  if (!audioContext.value) return
+
+  try {
+    // Get source node - it should already be created by note detection
+    const sourceNode = getSourceNode()
+    if (!sourceNode) {
+      // Retry after a short delay
+      setTimeout(initPitchShifter, 100)
+      return
+    }
+
+    // Clean up existing pitch shifter
+    cleanupPitchShifter()
+
+    // Create pitch shifter node using soundbank-pitch-shift
+    // This creates an AudioNode that can be inserted into the audio chain
+    pitchShifterNode.value = createPitchShifter(audioContext.value)
+
+    // Disconnect source from analyser
+    sourceNode.disconnect()
+    
+    // Connect: source -> pitch shifter -> analyser -> destination
+    sourceNode.connect(pitchShifterNode.value)
+    
+    // Set the pitch shifter output as the node to insert in the audio chain
+    // This will reconnect the analyser to use pitch shifter output
+    setPitchShifterNode(pitchShifterNode.value)
+
+    // Apply current pitch
+    applyPitchShift()
+  } catch (error) {
+    console.error('Error initializing pitch shifter:', error)
+    // Fallback to playbackRate method
+    applyPitchShiftFallback()
+  }
+}
+
+// Apply pitch shift using soundbank-pitch-shift
+const applyPitchShift = () => {
+  if (!audioPlayer.value) return
+
+  // Always apply speed to audio element (speed is independent)
+  audioPlayer.value.playbackRate = currentSpeed.value
+
+  // If pitch shifter is available, use it
+  if (pitchShifterNode.value) {
+    // soundbank-pitch-shift uses semitones directly via transpose property
+    pitchShifterNode.value.transpose = currentPitch.value
+    
+    // Set wet/dry mix (1 = fully processed, 0 = original)
+    if (pitchShifterNode.value.wet) {
+      pitchShifterNode.value.wet.value = currentPitch.value === 0 ? 0 : 1
+    }
+    if (pitchShifterNode.value.dry) {
+      pitchShifterNode.value.dry.value = currentPitch.value === 0 ? 1 : 0
+    }
+    return
+  }
+
+  // Fallback: use playbackRate (changes both pitch and speed)
+  applyPitchShiftFallback()
+}
+
+// Fallback method using playbackRate (changes both pitch and speed)
+const applyPitchShiftFallback = () => {
+  if (!audioPlayer.value) return
+
+  if (currentPitch.value === 0) {
+    audioPlayer.value.playbackRate = currentSpeed.value
+  } else {
+    const pitchRatio = Math.pow(2, currentPitch.value / 12)
+    audioPlayer.value.playbackRate = currentSpeed.value * pitchRatio
+  }
+}
+
+// Watch for pitch and speed changes and apply them
+watch([() => currentPitch.value, () => currentSpeed.value], () => {
+  applyPitchShift()
+}, { immediate: true })
 
 // Enhanced handlers
 const togglePlayPause = () => {
@@ -203,6 +307,12 @@ const handleLoadedMetadata = () => {
   } else {
     // Set up analysis if not already done
     setupAudioAnalysis()
+    // Reinitialize pitch shifter if needed
+    setTimeout(() => {
+      if (!pitchShifterNode.value) {
+        initPitchShifter()
+      }
+    }, 200)
   }
 
   // Initialize waveform in WaveformViewer
@@ -292,10 +402,27 @@ watch([loopStart, loopEnd], ([newStart, newEnd], [oldStart, oldEnd]) => {
 })
 
 
+// Clean up pitch shifter
+const cleanupPitchShifter = () => {
+  if (pitchShifterNode.value) {
+    try {
+      pitchShifterNode.value.disconnect()
+    } catch (e) {
+      // Ignore disconnect errors
+    }
+    pitchShifterNode.value = null
+  }
+  
+  setPitchShifterNode(null)
+}
+
 // Reset when file changes
 watch(() => props.file, () => {
   // Stop note detection
   stopNoteDetection()
+
+  // Clean up pitch shifter
+  cleanupPitchShifter()
 
   // Clean up audio context
   if (audioContext.value) {
@@ -308,6 +435,9 @@ watch(() => props.file, () => {
 onUnmounted(() => {
   stopNoteDetection()
   cleanupNoteDetection()
+
+  // Clean up pitch shifter
+  cleanupPitchShifter()
 
   // Clean up audio context
   if (audioContext.value) {
@@ -530,6 +660,10 @@ onMounted(() => {
 }
 
 .speed-controls-row {
+  width: 100%;
+}
+
+.pitch-controls-row {
   width: 100%;
 }
 

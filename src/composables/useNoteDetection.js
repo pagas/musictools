@@ -8,6 +8,7 @@ export function useNoteDetection(audioPlayer, audioContext) {
   const detectedNote = ref('')
   const detectedFrequency = ref(0)
   const noteDetectionActive = ref(false)
+  const pitchShifterNode = ref(null) // Optional pitch shifter node
 
   const isNoteDetectionActive = computed(() => {
     return noteDetectionActive.value && 
@@ -122,7 +123,16 @@ export function useNoteDetection(audioPlayer, audioContext) {
         sourceNode.value.disconnect()
       }
       sourceNode.value = audioContext.value.createMediaElementSource(audioPlayer.value)
-      sourceNode.value.connect(analyser.value)
+      
+      // Connect through pitch shifter if available, otherwise directly to analyser
+      if (pitchShifterNode.value) {
+        // Source connects to pitch shifter input (which will be the delay nodes)
+        // Pitch shifter output connects to analyser
+        // Note: The actual connection to delay nodes happens in MusicPlayer
+        pitchShifterNode.value.connect(analyser.value)
+      } else {
+        sourceNode.value.connect(analyser.value)
+      }
       analyser.value.connect(audioContext.value.destination)
       
       // Start note detection if playing
@@ -196,6 +206,30 @@ export function useNoteDetection(audioPlayer, audioContext) {
     dataArray.value = null
   }
 
+  // Set pitch shifter node (called from MusicPlayer)
+  const setPitchShifterNode = (node) => {
+    const wasConnected = pitchShifterNode.value !== null
+    pitchShifterNode.value = node
+    
+    // Reconnect if source node already exists
+    if (sourceNode.value && analyser.value) {
+      // Disconnect analyser from destination temporarily
+      analyser.value.disconnect()
+      
+      if (pitchShifterNode.value) {
+        // Connect pitch shifter output to analyser
+        pitchShifterNode.value.connect(analyser.value)
+      } else {
+        // Connect source directly to analyser
+        sourceNode.value.disconnect()
+        sourceNode.value.connect(analyser.value)
+      }
+      
+      // Reconnect analyser to destination
+      analyser.value.connect(audioContext.value.destination)
+    }
+  }
+
   return {
     analyser,
     detectedNote,
@@ -204,6 +238,8 @@ export function useNoteDetection(audioPlayer, audioContext) {
     setupAudioAnalysis,
     startNoteDetection,
     stopNoteDetection,
-    cleanup
+    cleanup,
+    getSourceNode: () => sourceNode.value,
+    setPitchShifterNode
   }
 }

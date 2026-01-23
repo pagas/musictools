@@ -7,6 +7,7 @@ export function useAudio(file) {
   const duration = ref(0)
   const volume = ref(100)
   const currentSpeed = ref(1)
+  const currentPitch = ref(0) // Pitch in semitones
 
   const audioUrl = computed(() => {
     return file.value ? URL.createObjectURL(file.value) : ''
@@ -24,9 +25,14 @@ export function useAudio(file) {
 
   const setPlaybackSpeed = (speed) => {
     currentSpeed.value = speed
-    if (audioPlayer.value) {
-      audioPlayer.value.playbackRate = speed
-    }
+    // Pitch will be applied via watch in MusicPlayer component
+    // Don't set playbackRate here to avoid conflicts
+  }
+
+  const setPitch = (semitones) => {
+    currentPitch.value = semitones
+    // Pitch is handled via Web Audio API in MusicPlayer component
+    // This just stores the value
   }
 
   const updateVolume = (newVolume) => {
@@ -66,6 +72,7 @@ export function useAudio(file) {
   watch(() => file.value, () => {
     isPlaying.value = false
     currentSpeed.value = 1
+    currentPitch.value = 0
     currentTime.value = 0
     volume.value = 100
     if (audioPlayer.value) {
@@ -81,9 +88,11 @@ export function useAudio(file) {
     duration,
     volume,
     currentSpeed,
+    currentPitch,
     audioUrl,
     togglePlayPause,
     setPlaybackSpeed,
+    setPitch,
     updateVolume,
     seek,
     handleLoadedMetadata,

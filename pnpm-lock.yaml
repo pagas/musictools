@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      soundbank-pitch-shift:
+        specifier: ^1.0.3
+        version: 1.0.3
       vue:
         specifier: ^3.5.13
         version: 3.5.27
@@ -364,6 +367,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  custom-audio-node@0.3.1:
+    resolution: {integrity: sha512-dngD8d+IEG36aPFJJHm4bLsk8iSkj2cCf6OC71qkrdT8J98WWmnKIDMUh6V/J/9KfLHeKnbX4G5HjDbb7+bi6Q==}
+
   entities@7.0.0:
     resolution: {integrity: sha512-FDWG5cmEYf2Z00IkYRhbFrwIwvdFKH07uV8dvNy0omp/Qb1xcyCWp2UDtcwJF4QZZvk0sLudP6/hAu42TaqVhQ==}
     engines: {node: '>=0.12'}
@@ -413,6 +419,9 @@ packages:
     resolution: {integrity: sha512-PggGy4dhwx5qaW+CKBilA/98Ql9keyfnb7lh4SR6shQ91QQQi1ORJ1v4UinkdP2i87OBs9AQFooQylcrrRfIcg==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  soundbank-pitch-shift@1.0.3:
+    resolution: {integrity: sha512-50z+2LK9QUSB8tddIsqvqkbbf74oLlW6ApmQVRkPqp5YW4kAD6dxkfiAw//tPN0fe2dB59LzKgm/qdXf8kyjpQ==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -703,6 +712,8 @@ snapshots:
 
   csstype@3.2.3: {}
 
+  custom-audio-node@0.3.1: {}
+
   entities@7.0.0: {}
 
   esbuild@0.25.12:
@@ -789,6 +800,10 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.55.2
       '@rollup/rollup-win32-x64-msvc': 4.55.2
       fsevents: 2.3.3
+
+  soundbank-pitch-shift@1.0.3:
+    dependencies:
+      custom-audio-node: 0.3.1
 
   source-map-js@1.2.1: {}
 
