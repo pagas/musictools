@@ -238,7 +238,7 @@ const zoomIn = () => zoomInFn(() => drawWaveform())
 const zoomOut = () => zoomOutFn(() => drawWaveform())
 const resetZoom = () => resetZoomFn(() => drawWaveform())
 const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, () => drawWaveform())
-const handleScrollbarInput = (event) => {
+const handleScrollbarInput = () => {
   isDraggingScrollbar.value = true
   
   // Use the v-model value directly
@@ -248,26 +248,17 @@ const handleScrollbarInput = (event) => {
     return
   }
   
-  const value = rawValue / 1000
-  const visibleDuration = props.duration / zoomLevel.value
-  const maxOffset = Math.max(0, props.duration - visibleDuration)
-  const newOffset = Math.max(0, Math.min(maxOffset, value))
+  // Create a synthetic event object for handleScrollbarInputFn
+  const syntheticEvent = {
+    target: { value: rawValue }
+  }
   
-  zoomOffset.value = newOffset
-  drawWaveform()
+  handleScrollbarInputFn(syntheticEvent, () => drawWaveform())
   
   // Reset dragging flag after a short delay
   setTimeout(() => {
     isDraggingScrollbar.value = false
   }, 100)
-}
-
-// Canvas click handler - only seek if it was a click, not a drag
-const handleCanvasClick = (event) => {
-  // Only seek if we didn't just finish a drag selection
-  if (!isDraggingSelection.value && !draggingMarker.value) {
-    handleCanvasClickBase(event)
-  }
 }
 
 // Wrapper for canvas mouse up to avoid interfering with drag selection
@@ -304,7 +295,7 @@ const handleCanvasMouseDownSelection = (event) => {
   
   dragStartX.value = x
   dragCurrentX.value = x
-  dragStartTime.value = getTimeFromPositionLocal(clientX)
+  dragStartTime.value = getTimeFromPosition(clientX, progressWrapper.value)
   isDraggingSelection.value = false // Start as false, will become true on move
   
   // Store initial position to detect if it's a drag
@@ -405,7 +396,7 @@ const stopSelectionDrag = (event) => {
     return // No valid clientX found
   }
   
-  const endTime = getTimeFromPositionLocal(clientX)
+  const endTime = getTimeFromPosition(clientX, progressWrapper.value)
   
   if (dragStartTime.value !== null && endTime !== null) {
     const startTime = Math.min(dragStartTime.value, endTime)
@@ -484,7 +475,7 @@ const updateMarkerPosition = (clientX) => {
   // Use progressWrapper from template ref
   if (!progressWrapper.value) return
   
-  const time = getTimeFromPositionLocal(clientX)
+  const time = getTimeFromPosition(clientX, progressWrapper.value)
   if (time === null) return
   
   if (draggingMarker.value === 'start') {
@@ -508,43 +499,6 @@ watch([waveformCanvas, () => props.duration, () => props.file], async ([canvas, 
     }, 200)
   }
 }, { immediate: true })
-
-// Also try to initialize when component is mounted
-onMounted(async () => {
-  await nextTick()
-  await nextTick()
-  if (waveformCanvas.value && props.duration > 0 && props.file) {
-    setTimeout(() => {
-      if (waveformCanvas.value && waveformCanvas.value.offsetWidth > 0 && waveformCanvas.value.offsetHeight > 0) {
-        initAudioContext()
-      }
-    }, 300)
-  }
-})
-
-// Local helper that uses our progressWrapper ref and zoom state
-const getTimeFromPositionLocal = (clientX) => {
-  if (!progressWrapper.value || !props.duration) return null
-  
-  const rect = progressWrapper.value.getBoundingClientRect()
-  const x = clientX - rect.left
-  
-  const zoomLevelVal = zoomLevel.value
-  const zoomOffsetVal = (typeof zoomOffset.value === 'number' && !isNaN(zoomOffset.value)) ? zoomOffset.value : 0
-  
-  if (!zoomLevelVal || zoomLevelVal <= 0) {
-    // No zoom, simple calculation
-    const pixelToTime = props.duration / rect.width
-    return Math.max(0, Math.min(props.duration, x * pixelToTime))
-  }
-  
-  const visibleDuration = props.duration / zoomLevelVal
-  const maxOffset = Math.max(0, props.duration - visibleDuration)
-  const clampedOffset = Math.max(0, Math.min(maxOffset, zoomOffsetVal))
-  const pixelToTime = visibleDuration / rect.width
-  const time = clampedOffset + (x * pixelToTime)
-  return Math.max(0, Math.min(props.duration, time))
-}
 
 onUnmounted(() => {
   stopDrag()

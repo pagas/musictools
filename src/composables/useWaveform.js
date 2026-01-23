@@ -7,8 +7,6 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
   const progressWrapper = wrapperRef !== undefined ? wrapperRef : ref(null)
   const audioContext = ref(null)
   const waveformData = ref(null)
-  const isClick = ref(false)
-  const clickStartTime = ref(0)
 
   // Helper to get value from ref or getter function
   const getValue = (refOrGetter) => {
@@ -314,23 +312,11 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
   const handleCanvasMouseDown = (event) => {
     const durationVal = getValue(duration)
     if (!waveformCanvas.value || !durationVal) return
-    isClick.value = true
-    clickStartTime.value = Date.now()
     event.preventDefault()
   }
 
   // Handle mouse move on canvas
-  const handleCanvasMouseMove = (event) => {
-    const durationVal = getValue(duration)
-    if (!waveformCanvas.value || !durationVal) return
-    
-    if (isClick.value && clickStartTime.value > 0) {
-      const timeSinceStart = Date.now() - clickStartTime.value
-      if (timeSinceStart > 200) {
-        // Consider it might be a drag
-      }
-    }
-    
+  const handleCanvasMouseMove = () => {
     if (waveformCanvas.value) {
       waveformCanvas.value.style.cursor = 'pointer'
     }
@@ -338,9 +324,7 @@ export function useWaveform(audioPlayer, file, duration, currentTime, loopStart,
 
   // Handle mouse up on canvas
   const handleCanvasMouseUp = () => {
-    setTimeout(() => {
-      isClick.value = false
-    }, 50)
+    // Mouse up handled by component-level logic
   }
 
   // Get time from position (for loop markers)
