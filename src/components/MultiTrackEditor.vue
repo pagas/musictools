@@ -10,9 +10,10 @@
             <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
           </svg>
         </button>
-        <button class="stop-btn" @click="stop" :disabled="!isPlaying">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12" />
+        <button class="stop-btn" @click="goToStart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="11 17 6 12 11 7"></polyline>
+            <polyline points="18 17 13 12 18 7"></polyline>
           </svg>
         </button>
         <div class="time-display">{{ formatTime(currentTime) }}</div>
@@ -556,6 +557,13 @@ const stop = () => {
   stopAll()
 }
 
+const goToStart = () => {
+  pause()
+  currentTime.value = 0
+  playbackStartTime.value = 0
+  stopAll()
+}
+
 // Playhead dragging
 const handlePlayheadDragStart = (event) => {
   event.preventDefault()
@@ -688,18 +696,13 @@ watch(uploadedFiles, (newFiles) => {
 }
 
 .stop-btn {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
-  box-shadow: 0 3px 10px rgba(255, 107, 107, 0.4);
+  background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
 }
 
-.stop-btn:hover:not(:disabled) {
+.stop-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 5px 15px rgba(255, 107, 107, 0.6);
-}
-
-.stop-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
 }
 
 .play-btn svg,
