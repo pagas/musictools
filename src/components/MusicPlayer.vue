@@ -1,115 +1,67 @@
 <template>
   <div class="player-section">
-    <audio
-      ref="audioPlayer"
-      :src="audioUrl"
-      :loop="repeatTrack"
-      preload="metadata"
-      @loadedmetadata="handleLoadedMetadata"
-      @timeupdate="handleTimeUpdate"
-      @play="handlePlay"
-      @pause="handlePause"
-      @ended="handleEnded"
-    ></audio>
+    <audio ref="audioPlayer" :src="audioUrl" :loop="repeatTrack" preload="metadata"
+      @loadedmetadata="handleLoadedMetadata" @timeupdate="handleTimeUpdate" @play="handlePlay" @pause="handlePause"
+      @ended="handleEnded"></audio>
 
     <div class="player-controls">
       <div class="controls-layout">
         <div class="volume-play-wrapper">
           <button class="play-btn" @click="togglePlayPause">
             <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
+              <path d="M8 5v14l11-7z" />
             </svg>
             <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
             </svg>
           </button>
-          <button 
-            class="seek-btn seek-start-btn" 
-            @click="seekToStart"
-            :disabled="!duration || duration === 0"
-            title="Go to Start"
-          >
+          <button class="seek-btn seek-start-btn" @click="seekToStart" :disabled="!duration || duration === 0"
+            title="Go to Start">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="11 17 6 12 11 7"></polyline>
               <polyline points="18 17 13 12 18 7"></polyline>
             </svg>
           </button>
-          <button 
-            class="seek-btn repeat-btn" 
-            :class="{ active: repeatTrack }"
-            @click="toggleRepeat"
-            :disabled="!duration || duration === 0"
-            title="Repeat Track"
-          >
+          <button class="seek-btn repeat-btn" :class="{ active: repeatTrack }" @click="toggleRepeat"
+            :disabled="!duration || duration === 0" title="Repeat Track">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
             </svg>
           </button>
-          <VolumeControl
-            :volume="volume"
-            @update:volume="updateVolume"
-          />
+          <VolumeControl :volume="volume" @update:volume="updateVolume" />
         </div>
 
         <div class="note-display-column">
-          <NoteDetector
-            :isNoteDetectionActive="isNoteDetectionActive"
-            :detectedNote="detectedNote"
-            :detectedFrequency="detectedFrequency"
-            :currentTime="currentTime"
-          />
+          <NoteDetector :isNoteDetectionActive="isNoteDetectionActive" :detectedNote="detectedNote"
+            :detectedFrequency="detectedFrequency" :currentTime="currentTime" />
         </div>
       </div>
 
-      <PlaybackControls
-        :currentTime="currentTime"
-        :duration="duration"
-      />
-      
-      <WaveformViewer
-        :file="file"
-        :audioPlayer="audioPlayer"
-        :duration="duration"
-        :currentTime="currentTime"
-        :loopStart="loopStart"
-        :loopEnd="loopEnd"
-        @seek="seek"
-        @update:loopStart="loopStart = $event"
-        @update:loopEnd="loopEnd = $event"
-        ref="waveformViewerRef"
-      />
-    </div>
+      <PlaybackControls :currentTime="currentTime" :duration="duration" />
 
-    <div class="controls-row">
-      <LoopControls
-        :loopStart="loopStart"
-        :loopEnd="loopEnd"
-        :loopStartInput="loopStartInput"
-        :loopEndInput="loopEndInput"
-        :duration="duration"
-        :isLoopValid="isLoopValid"
-        @setLoopStart="setLoopStart"
-        @setLoopEnd="setLoopEnd"
-        @clearLoop="clearLoop"
-        @loopStartInput="handleLoopStartInput"
-        @loopEndInput="handleLoopEndInput"
-        @applyLoopStartInput="applyLoopStartInput"
-        @applyLoopEndInput="applyLoopEndInput"
-        @incrementLoopStart="incrementLoopStart"
-        @decrementLoopStart="decrementLoopStart"
-        @incrementLoopStartMs="incrementLoopStartMs"
-        @decrementLoopStartMs="decrementLoopStartMs"
-        @incrementLoopEnd="incrementLoopEnd"
-        @decrementLoopEnd="decrementLoopEnd"
-        @incrementLoopEndMs="incrementLoopEndMs"
-        @decrementLoopEndMs="decrementLoopEndMs"
-      />
+      <WaveformViewer :file="file" :audioPlayer="audioPlayer" :duration="duration" :currentTime="currentTime"
+        :loopStart="loopStart" :loopEnd="loopEnd" @seek="seek" @update:loopStart="loopStart = $event"
+        @update:loopEnd="loopEnd = $event" ref="waveformViewerRef" />
 
-      <SpeedControls
-        :currentSpeed="currentSpeed"
-        :speedOptions="speedOptions"
-        @setSpeed="setPlaybackSpeed"
-      />
+      <div class="controls-section">
+
+
+        <div class="loop-controls-row">
+          <LoopControls :loopStart="loopStart" :loopEnd="loopEnd" :loopStartInput="loopStartInput"
+            :loopEndInput="loopEndInput" :duration="duration" :isLoopValid="isLoopValid" @setLoopStart="setLoopStart"
+            @setLoopEnd="setLoopEnd" @clearLoop="clearLoop" @loopStartInput="handleLoopStartInput"
+            @loopEndInput="handleLoopEndInput" @applyLoopStartInput="applyLoopStartInput"
+            @applyLoopEndInput="applyLoopEndInput" @incrementLoopStart="incrementLoopStart"
+            @decrementLoopStart="decrementLoopStart" @incrementLoopStartMs="incrementLoopStartMs"
+            @decrementLoopStartMs="decrementLoopStartMs" @incrementLoopEnd="incrementLoopEnd"
+            @decrementLoopEnd="decrementLoopEnd" @incrementLoopEndMs="incrementLoopEndMs"
+            @decrementLoopEndMs="decrementLoopEndMs" />
+        </div>
+
+        <div class="speed-controls-row">
+          <SpeedControls :currentSpeed="currentSpeed" :speedOptions="speedOptions" @setSpeed="setPlaybackSpeed" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -204,14 +156,14 @@ const repeatTrack = ref(false)
 // Initialize audio context for note detection
 const initAudioContext = () => {
   if (!audioPlayer.value) return
-  
+
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
     audioContext.value = new AudioContextClass()
-    
+
     // Set up analyser for real-time note detection
     setupAudioAnalysis()
-    
+
     // Start note detection if playing
     if (!audioPlayer.value.paused) {
       if (audioContext.value.state === 'suspended') {
@@ -227,7 +179,7 @@ const initAudioContext = () => {
 // Enhanced handlers
 const togglePlayPause = () => {
   togglePlayPauseBase()
-  
+
   // Manage note detection
   if (audioPlayer.value && !audioPlayer.value.paused) {
     // Resume audio context if suspended
@@ -252,7 +204,7 @@ const handleLoadedMetadata = () => {
     // Set up analysis if not already done
     setupAudioAnalysis()
   }
-  
+
   // Initialize waveform in WaveformViewer
   if (waveformViewerRef.value) {
     waveformViewerRef.value.initAudioContext()
@@ -261,7 +213,7 @@ const handleLoadedMetadata = () => {
 
 const handleTimeUpdate = () => {
   handleTimeUpdateBase()
-  
+
   // Handle loop jumping
   if (loopEnabled.value && loopStart.value !== null && loopEnd.value !== null) {
     if (audioPlayer.value && audioPlayer.value.currentTime >= loopEnd.value) {
@@ -344,10 +296,10 @@ watch([loopStart, loopEnd], ([newStart, newEnd], [oldStart, oldEnd]) => {
 watch(() => props.file, () => {
   // Stop note detection
   stopNoteDetection()
-  
+
   // Clean up audio context
   if (audioContext.value) {
-    audioContext.value.close().catch(() => {})
+    audioContext.value.close().catch(() => { })
     audioContext.value = null
   }
 })
@@ -356,10 +308,10 @@ watch(() => props.file, () => {
 onUnmounted(() => {
   stopNoteDetection()
   cleanupNoteDetection()
-  
+
   // Clean up audio context
   if (audioContext.value) {
-    audioContext.value.close().catch(() => {})
+    audioContext.value.close().catch(() => { })
     audioContext.value = null
   }
 })
@@ -381,6 +333,7 @@ onMounted(() => {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -439,14 +392,9 @@ onMounted(() => {
     width: 100%;
   }
 
-  .controls-row {
-    flex-direction: column;
+  .controls-section {
+    margin-top: 20px;
     gap: 15px;
-  }
-
-  .controls-row > * {
-    min-width: unset;
-    width: 100%;
   }
 }
 
@@ -574,15 +522,18 @@ onMounted(() => {
   box-shadow: 0 5px 15px rgba(81, 207, 102, 0.6);
 }
 
-.controls-row {
+.controls-section {
+  margin-top: 10px;
   display: flex;
+  flex-direction: column;
   gap: 20px;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
 }
 
-.controls-row > * {
-  flex: 1;
-  min-width: 300px;
+.speed-controls-row {
+  width: 100%;
+}
+
+.loop-controls-row {
+  width: 100%;
 }
 </style>

@@ -1,16 +1,14 @@
 <template>
   <div class="loop-controls">
     <h3>Loop Controls</h3>
-    <div class="loop-buttons">
+    <div class="loop-time-inputs">
       <button 
         class="loop-btn loop-clear" 
         @click="$emit('clearLoop')"
-        v-if="loopStart !== null || loopEnd !== null"
+        :disabled="loopStart === null && loopEnd === null"
       >
         Clear Loop
       </button>
-    </div>
-    <div class="loop-time-inputs">
       <div class="time-input-group">
         <label for="loopStartInput">Loop Start:</label>
         <div class="time-input-wrapper">
@@ -195,7 +193,6 @@ defineEmits([
   display: flex;
   flex-direction: column;
   background: #f8f9ff;
-  padding: 15px;
   border-radius: 15px;
 }
 
@@ -206,13 +203,6 @@ defineEmits([
   font-size: 1.1em;
 }
 
-.loop-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 25px;
-}
 
 .loop-btn {
   padding: 8px 16px;
@@ -243,28 +233,38 @@ defineEmits([
   background: #ff6b6b;
   color: white;
   border-color: #ff6b6b;
+  margin-bottom: 0;
 }
 
-.loop-btn.loop-clear:hover {
+.loop-btn.loop-clear:hover:not(:disabled) {
   background: #ff5252;
   border-color: #ff5252;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
 }
 
+.loop-btn.loop-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #ccc;
+  border-color: #ccc;
+}
+
 .loop-time-inputs {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
+  flex-direction: row;
+  gap: 20px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .time-input-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 100%;
-  max-width: 250px;
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
 }
 
 .time-input-group label {
@@ -377,21 +377,20 @@ defineEmits([
 
 /* Mobile responsive styles */
 @media (max-width: 768px) {
-  .loop-controls {
-    padding: 12px;
-  }
 
   .loop-controls h3 {
     font-size: 1em;
   }
 
-  .loop-buttons {
-    margin-bottom: 15px;
-  }
-
   .loop-btn {
     padding: 6px 12px;
     font-size: 0.8em;
+  }
+
+  .loop-time-inputs {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
   }
 
   .time-input-group {
@@ -410,22 +409,25 @@ defineEmits([
 }
 
 @media (max-width: 480px) {
-  .loop-controls {
-    padding: 10px;
-  }
 
   .loop-controls h3 {
     font-size: 0.95em;
     margin-bottom: 10px;
   }
 
-  .loop-buttons {
-    margin-bottom: 12px;
-  }
-
   .loop-btn {
     padding: 6px 10px;
     font-size: 0.75em;
+  }
+
+  .loop-time-inputs {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .time-input-group {
+    max-width: 100%;
   }
 
   .time-input-group label {

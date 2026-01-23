@@ -1,6 +1,6 @@
 <template>
   <div class="speed-controls">
-    <h3>Playback Speed</h3>
+    <h3>Speed</h3>
     <div class="speed-buttons">
       <button
         v-for="speed in speedOptions"
@@ -35,14 +35,12 @@ defineEmits(['setSpeed'])
   display: flex;
   flex-direction: column;
   background: #f8f9ff;
-  padding: 15px;
   border-radius: 15px;
 }
 
 .speed-controls h3 {
   margin-bottom: 12px;
   color: #333;
-  text-align: center;
   font-size: 1.1em;
 }
 
@@ -80,9 +78,6 @@ defineEmits(['setSpeed'])
 
 /* Mobile responsive styles */
 @media (max-width: 480px) {
-  .speed-controls {
-    padding: 12px;
-  }
 
   .speed-controls h3 {
     font-size: 1em;
