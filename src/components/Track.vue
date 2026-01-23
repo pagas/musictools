@@ -56,6 +56,7 @@
         :trackIndex="trackIndex"
         :pixelsPerSecond="pixelsPerSecond"
         :isPlaying="playingBlocks.has(block.fileId)"
+        :color="block.color"
         @drag-start="handleBlockDragStart"
         @drag-move="handleBlockDragMove"
         @drag-end="handleBlockDragEnd"
@@ -129,14 +130,18 @@ const handleDrop = (event) => {
           duration: blockData.duration,
           trackIndex: props.trackIndex,
           dropTime,
-          sourceTrackIndex: blockData.trackIndex
+          sourceTrackIndex: blockData.trackIndex,
+          color: blockData.color
         })
       } else {
         // New block from library
         emit('drop-block', {
-          ...blockData,
+          fileId: blockData.fileId,
+          file: blockData.file,
+          duration: blockData.duration,
           trackIndex: props.trackIndex,
-          dropTime
+          dropTime,
+          color: blockData.color // Explicitly pass color from library
         })
       }
     } catch (e) {

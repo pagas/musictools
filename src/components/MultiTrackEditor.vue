@@ -287,11 +287,12 @@ const handleLibraryDragStart = (event, file) => {
   event.dataTransfer.setData('application/json', JSON.stringify({
     fileId: file.id,
     file: file.file,
-    duration: file.duration
+    duration: file.duration,
+    color: file.color
   }))
 }
 
-const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null }) => {
+const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sourceTrackIndex = null, color = null }) => {
   const track = tracks.value[trackIndex]
   if (!track) return
 
@@ -313,7 +314,8 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sou
         trackId: track.id,
         startTime,
         file: existingBlock.file,
-        duration: existingBlock.duration
+        duration: existingBlock.duration,
+        color: existingBlock.color // Preserve color when moving between tracks
       })
       return
     }
@@ -335,12 +337,17 @@ const handleDropBlock = ({ fileId, file, duration, trackIndex, dropTime = 0, sou
   // Find a non-overlapping position for the new block
   const startTime = findNonOverlappingPosition(track.id, dropTime, uploadedFile.duration)
 
+  // Use color from drag data if provided, otherwise use color from uploaded file
+  // Check for both null and undefined
+  const blockColor = (color !== null && color !== undefined) ? color : uploadedFile.color
+
   blocks.value.push({
     fileId,
     trackId: track.id,
     startTime,
     file: uploadedFile.file,
-    duration: uploadedFile.duration
+    duration: uploadedFile.duration,
+    color: blockColor
   })
 }
 

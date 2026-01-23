@@ -56,6 +56,10 @@ const props = defineProps({
   isPlaying: {
     type: Boolean,
     default: false
+  },
+  color: {
+    type: String,
+    default: null
   }
 })
 
@@ -69,10 +73,15 @@ const isHtml5Dragging = ref(false)
 const blockStyle = computed(() => {
   const width = props.duration * props.pixelsPerSecond
   const left = props.startTime * props.pixelsPerSecond
-  return {
+  const style = {
     width: `${width}px`,
     left: `${left}px`
   }
+  if (props.color) {
+    // Use 'background' instead of 'backgroundColor' to override the CSS gradient
+    style.background = props.color
+  }
+  return style
 })
 
 const formatDuration = (seconds) => {
@@ -140,7 +149,8 @@ const handleDragStart = (event) => {
     fileId: props.fileId,
     trackIndex: props.trackIndex,
     startTime: props.startTime,
-    duration: props.duration
+    duration: props.duration,
+    color: props.color
   }))
 }
 
@@ -168,7 +178,7 @@ const handleDelete = () => {
   justify-content: space-between;
   padding: 8px 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease, background-image 0.2s ease;
   min-width: 80px;
   z-index: 2;
 }
