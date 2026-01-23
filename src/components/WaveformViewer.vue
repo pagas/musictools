@@ -6,9 +6,6 @@
         class="waveform-canvas"
         @wheel.prevent="handleWheelZoom"
         @mousedown="handleCanvasMouseDownSelection"
-        @mousemove="handleCanvasMouseMoveWrapper"
-        @mouseup="handleCanvasMouseUpWrapper"
-        @mouseleave="handleCanvasMouseUpWrapper"
         @touchstart="handleCanvasMouseDownSelection"
       ></canvas>
       <!-- Drag selection overlay -->
@@ -149,6 +146,12 @@ const dragStartX = ref(0)
 const dragCurrentX = ref(0)
 const dragStartTime = ref(0)
 
+// Constants
+const DRAG_THRESHOLD_PX = 5
+const DRAG_THRESHOLD_MS = 100
+const MIN_SELECTION_DURATION = 0.1
+const WAVEFORM_INIT_DELAY = 200
+
 // Use zoom composable
 const {
   zoomLevel,
@@ -196,24 +199,17 @@ defineExpose({
   drawWaveform
 })
 
-// Computed properties for loop marker positions - using shared helper functions
-const loopStartPosition = computed(() => {
-  if (props.loopStart === null || !props.duration) return '0%'
-  
-  const position = getLoopMarkerPosition(props.loopStart)
+// Helper to format loop marker position
+const formatLoopMarkerPosition = (time) => {
+  if (time === null || !props.duration) return '0%'
+  const position = getLoopMarkerPosition(time)
   if (!position) return '0%'
-  
   return position.type === 'percentage' ? `${position.value}%` : position.value
-})
+}
 
-const loopEndPosition = computed(() => {
-  if (props.loopEnd === null || !props.duration) return '0%'
-  
-  const position = getLoopMarkerPosition(props.loopEnd)
-  if (!position) return '0%'
-  
-  return position.type === 'percentage' ? `${position.value}%` : position.value
-})
+// Computed properties for loop marker positions
+const loopStartPosition = computed(() => formatLoopMarkerPosition(props.loopStart))
+const loopEndPosition = computed(() => formatLoopMarkerPosition(props.loopEnd))
 
 const loopRangeStyle = computed(() => {
   return getLoopRangeStyle(props.loopStart, props.loopEnd)
@@ -258,14 +254,36 @@ const handleScrollbarInput = () => {
   }, 100)
 }
 
-// Wrapper for canvas mouse up to avoid interfering with drag selection
-const handleCanvasMouseUpWrapper = () => {
-  // Mouse up handled by drag selection logic
+// Helper to extract clientX from mouse/touch events
+const getClientX = (event) => {
+  if (event.touches && event.touches.length > 0) {
+    return event.touches[0].clientX
+  }
+  if (event.changedTouches && event.changedTouches.length > 0) {
+    return event.changedTouches[0].clientX
+  }
+  if (event.clientX !== undefined) {
+    return event.clientX
+  }
+  return null
 }
 
-// Wrapper for canvas mouse move to avoid interfering with drag selection
-const handleCanvasMouseMoveWrapper = () => {
-  // Mouse move handled by drag selection logic
+// Helper to cleanup document event listeners and body styles
+const cleanupDocumentListeners = (handlers) => {
+  if (handlers.mousemove) {
+    document.removeEventListener('mousemove', handlers.mousemove)
+  }
+  if (handlers.mouseup) {
+    document.removeEventListener('mouseup', handlers.mouseup)
+  }
+  if (handlers.touchmove) {
+    document.removeEventListener('touchmove', handlers.touchmove)
+  }
+  if (handlers.touchend) {
+    document.removeEventListener('touchend', handlers.touchend)
+  }
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
 }
 
 // Handle canvas mouse down - start drag selection if not clicking on marker
@@ -277,7 +295,9 @@ const handleCanvasMouseDownSelection = (event) => {
   
   if (!progressWrapper.value || !props.duration) return
   
-  const clientX = event.touches ? event.touches[0].clientX : event.clientX
+  const clientX = getClientX(event)
+  if (clientX === null) return
+  
   const rect = progressWrapper.value.getBoundingClientRect()
   const x = clientX - rect.left
   
@@ -296,21 +316,15 @@ const handleCanvasMouseDownSelection = (event) => {
   const checkDrag = (moveEvent) => {
     if (!moveEvent) return
     
-    let moveClientX
-    if (moveEvent.touches && moveEvent.touches.length > 0) {
-      moveClientX = moveEvent.touches[0].clientX
-    } else if (moveEvent.clientX !== undefined) {
-      moveClientX = moveEvent.clientX
-    } else {
-      return // No valid clientX found
-    }
+    const moveClientX = getClientX(moveEvent)
+    if (moveClientX === null) return
     
     const moveX = moveClientX - rect.left
     const moveDistance = Math.abs(moveX - initialX)
     const timeElapsed = Date.now() - initialTime
     
-    // If moved more than 5px or 100ms passed, consider it a drag
-    if (moveDistance > 5 || timeElapsed > 100) {
+    // If moved more than threshold, consider it a drag
+    if (moveDistance > DRAG_THRESHOLD_PX || timeElapsed > DRAG_THRESHOLD_MS) {
       if (!isDraggingSelection.value) {
         isDraggingSelection.value = true
         document.body.style.cursor = 'crosshair'
@@ -330,12 +344,7 @@ const handleCanvasMouseDownSelection = (event) => {
       // It was just a click, seek to position
       handleCanvasClickBase(upEvent)
     }
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-    document.removeEventListener('touchmove', handleMouseMove)
-    document.removeEventListener('touchend', handleMouseUp)
-    document.body.style.userSelect = ''
-    document.body.style.cursor = ''
+    cleanupDocumentListeners({ mousemove: handleMouseMove, mouseup: handleMouseUp, touchmove: handleMouseMove, touchend: handleMouseUp })
   }
   
   document.addEventListener('mousemove', handleMouseMove)
@@ -351,14 +360,8 @@ const handleCanvasMouseDownSelection = (event) => {
 const handleSelectionDrag = (event) => {
   if (!progressWrapper.value || !event) return
   
-  let clientX
-  if (event.touches && event.touches.length > 0) {
-    clientX = event.touches[0].clientX
-  } else if (event.clientX !== undefined) {
-    clientX = event.clientX
-  } else {
-    return // No valid clientX found
-  }
+  const clientX = getClientX(event)
+  if (clientX === null) return
   
   const rect = progressWrapper.value.getBoundingClientRect()
   dragCurrentX.value = Math.max(0, Math.min(rect.width, clientX - rect.left))
@@ -375,16 +378,10 @@ const stopSelectionDrag = (event) => {
     return
   }
   
-  let clientX
-  if (event.touches && event.touches.length > 0) {
-    clientX = event.touches[0].clientX
-  } else if (event.changedTouches && event.changedTouches.length > 0) {
-    clientX = event.changedTouches[0].clientX
-  } else if (event.clientX !== undefined) {
-    clientX = event.clientX
-  } else {
+  const clientX = getClientX(event)
+  if (clientX === null) {
     cleanupSelectionDrag()
-    return // No valid clientX found
+    return
   }
   
   const endTime = getTimeFromPosition(clientX, progressWrapper.value)
@@ -393,8 +390,8 @@ const stopSelectionDrag = (event) => {
     const startTime = Math.min(dragStartTime.value, endTime)
     const finalEndTime = Math.max(dragStartTime.value, endTime)
     
-    // Only set if there's a meaningful selection (at least 0.1 seconds)
-    if (Math.abs(finalEndTime - startTime) >= 0.1) {
+    // Only set if there's a meaningful selection (at least minimum duration)
+    if (Math.abs(finalEndTime - startTime) >= MIN_SELECTION_DURATION) {
       emit('update:loopStart', Math.max(0, Math.min(startTime, props.duration)))
       emit('update:loopEnd', Math.max(0, Math.min(finalEndTime, props.duration)))
     }
@@ -487,7 +484,7 @@ watch([waveformCanvas, () => props.duration, () => props.file], async ([canvas, 
       if (canvas && canvas.offsetWidth > 0 && canvas.offsetHeight > 0) {
         initAudioContext()
       }
-    }, 200)
+    }, WAVEFORM_INIT_DELAY)
   }
 }, { immediate: true })
 
