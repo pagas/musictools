@@ -106,6 +106,15 @@ import { formatTime } from '../utils/timeFormat'
 import { useZoom } from '../composables/useZoom'
 import { useWaveform } from '../composables/useWaveform'
 
+// Constants
+const DRAG_THRESHOLD_PX = 5
+const DRAG_THRESHOLD_MS = 100
+const MIN_SELECTION_DURATION = 0.1
+const MIN_MARKER_SPACING = 0.1
+const WAVEFORM_INIT_DELAY = 200
+const SCROLLBAR_RESET_DELAY = 100
+
+// Props
 const props = defineProps({
   file: {
     type: File,
@@ -113,7 +122,6 @@ const props = defineProps({
   },
   audioPlayer: {
     type: Object,
-    required: false,
     default: null
   },
   duration: {
@@ -134,8 +142,10 @@ const props = defineProps({
   }
 })
 
+// Emits
 const emit = defineEmits(['update:loopStart', 'update:loopEnd'])
 
+// Template refs
 const progressWrapper = ref(null)
 const draggingMarker = ref(null)
 const waveformCanvas = ref(null)
@@ -145,12 +155,6 @@ const isDraggingSelection = ref(false)
 const dragStartX = ref(0)
 const dragCurrentX = ref(0)
 const dragStartTime = ref(0)
-
-// Constants
-const DRAG_THRESHOLD_PX = 5
-const DRAG_THRESHOLD_MS = 100
-const MIN_SELECTION_DURATION = 0.1
-const WAVEFORM_INIT_DELAY = 200
 
 // Use zoom composable
 const {
@@ -199,7 +203,12 @@ defineExpose({
   drawWaveform
 })
 
-// Helper to format loop marker position
+// Computed properties
+/**
+ * Formats loop marker position for CSS
+ * @param {number | null} time
+ * @returns {string}
+ */
 const formatLoopMarkerPosition = (time) => {
   if (time === null || !props.duration) return '0%'
   const position = getLoopMarkerPosition(time)
@@ -207,15 +216,11 @@ const formatLoopMarkerPosition = (time) => {
   return position.type === 'percentage' ? `${position.value}%` : position.value
 }
 
-// Computed properties for loop marker positions
 const loopStartPosition = computed(() => formatLoopMarkerPosition(props.loopStart))
 const loopEndPosition = computed(() => formatLoopMarkerPosition(props.loopEnd))
+const loopRangeStyle = computed(() => getLoopRangeStyle(props.loopStart, props.loopEnd))
 
-const loopRangeStyle = computed(() => {
-  return getLoopRangeStyle(props.loopStart, props.loopEnd)
-})
-
-// Local scrollbar value for v-model binding
+// Scrollbar state
 const scrollbarInputValue = ref(0)
 const isDraggingScrollbar = ref(false)
 
@@ -226,67 +231,87 @@ watch(scrollbarValue, (newValue) => {
   }
 }, { immediate: true })
 
-// Zoom functions that also trigger waveform redraw
-const zoomIn = () => zoomInFn(() => drawWaveform())
-const zoomOut = () => zoomOutFn(() => drawWaveform())
-const resetZoom = () => resetZoomFn(() => drawWaveform())
-const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, () => drawWaveform())
+// Zoom handlers
+const redrawWaveform = () => drawWaveform()
+
+const zoomIn = () => zoomInFn(redrawWaveform)
+const zoomOut = () => zoomOutFn(redrawWaveform)
+const resetZoom = () => resetZoomFn(redrawWaveform)
+const handleWheelZoom = (event) => handleWheelZoomFn(event, waveformCanvas, redrawWaveform)
+
 const handleScrollbarInput = () => {
   isDraggingScrollbar.value = true
   
-  // Use the v-model value directly
   const rawValue = scrollbarInputValue.value
   if (isNaN(rawValue)) {
     isDraggingScrollbar.value = false
     return
   }
   
-  // Create a synthetic event object for handleScrollbarInputFn
-  const syntheticEvent = {
-    target: { value: rawValue }
-  }
+  const syntheticEvent = { target: { value: rawValue } }
+  handleScrollbarInputFn(syntheticEvent, redrawWaveform)
   
-  handleScrollbarInputFn(syntheticEvent, () => drawWaveform())
-  
-  // Reset dragging flag after a short delay
   setTimeout(() => {
     isDraggingScrollbar.value = false
-  }, 100)
+  }, SCROLLBAR_RESET_DELAY)
 }
 
-// Helper to extract clientX from mouse/touch events
+// Utility functions
+/**
+ * Extracts clientX from mouse or touch events
+ * @param {MouseEvent | TouchEvent} event
+ * @returns {number | null}
+ */
 const getClientX = (event) => {
-  if (event.touches && event.touches.length > 0) {
+  if (!event) return null
+  
+  if (event.touches?.length > 0) {
     return event.touches[0].clientX
   }
-  if (event.changedTouches && event.changedTouches.length > 0) {
+  if (event.changedTouches?.length > 0) {
     return event.changedTouches[0].clientX
   }
-  if (event.clientX !== undefined) {
+  if (typeof event.clientX === 'number') {
     return event.clientX
   }
   return null
 }
 
-// Helper to cleanup document event listeners and body styles
+/**
+ * Clamps a value between min and max
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+
+/**
+ * Cleanup document event listeners and restore body styles
+ * @param {Object} handlers - Object with event handler functions
+ */
 const cleanupDocumentListeners = (handlers) => {
-  if (handlers.mousemove) {
-    document.removeEventListener('mousemove', handlers.mousemove)
-  }
-  if (handlers.mouseup) {
-    document.removeEventListener('mouseup', handlers.mouseup)
-  }
-  if (handlers.touchmove) {
-    document.removeEventListener('touchmove', handlers.touchmove)
-  }
-  if (handlers.touchend) {
-    document.removeEventListener('touchend', handlers.touchend)
-  }
+  const events = [
+    { name: 'mousemove', handler: handlers.mousemove },
+    { name: 'mouseup', handler: handlers.mouseup },
+    { name: 'touchmove', handler: handlers.touchmove },
+    { name: 'touchend', handler: handlers.touchend }
+  ]
+  
+  events.forEach(({ name, handler }) => {
+    if (handler) {
+      document.removeEventListener(name, handler)
+    }
+  })
+  
   document.body.style.userSelect = ''
   document.body.style.cursor = ''
 }
 
-// Handle canvas mouse down - start drag selection if not clicking on marker
+// Drag selection handlers
+/**
+ * Handles canvas mouse/touch down to start drag selection or seek
+ */
 const handleCanvasMouseDownSelection = (event) => {
   // Don't start selection if clicking on a marker or zoom controls
   if (draggingMarker.value || event.target.closest('.zoom-controls')) {
@@ -304,10 +329,11 @@ const handleCanvasMouseDownSelection = (event) => {
   // Check if click is within canvas bounds
   if (x < 0 || x > rect.width) return
   
+  // Initialize drag state
   dragStartX.value = x
   dragCurrentX.value = x
   dragStartTime.value = getTimeFromPosition(clientX, progressWrapper.value)
-  isDraggingSelection.value = false // Start as false, will become true on move
+  isDraggingSelection.value = false
   
   // Store initial position to detect if it's a drag
   const initialX = x
@@ -344,9 +370,15 @@ const handleCanvasMouseDownSelection = (event) => {
       // It was just a click, seek to position
       handleCanvasClickBase(upEvent)
     }
-    cleanupDocumentListeners({ mousemove: handleMouseMove, mouseup: handleMouseUp, touchmove: handleMouseMove, touchend: handleMouseUp })
+    cleanupDocumentListeners({ 
+      mousemove: handleMouseMove, 
+      mouseup: handleMouseUp, 
+      touchmove: handleMouseMove, 
+      touchend: handleMouseUp 
+    })
   }
   
+  // Add event listeners
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
   document.addEventListener('touchmove', handleMouseMove)
@@ -356,7 +388,9 @@ const handleCanvasMouseDownSelection = (event) => {
   event.preventDefault()
 }
 
-// Handle selection drag
+/**
+ * Handles selection drag movement
+ */
 const handleSelectionDrag = (event) => {
   if (!progressWrapper.value || !event) return
   
@@ -364,14 +398,16 @@ const handleSelectionDrag = (event) => {
   if (clientX === null) return
   
   const rect = progressWrapper.value.getBoundingClientRect()
-  dragCurrentX.value = Math.max(0, Math.min(rect.width, clientX - rect.left))
+  dragCurrentX.value = clamp(clientX - rect.left, 0, rect.width)
   
   if (!isDraggingSelection.value) {
     isDraggingSelection.value = true
   }
 }
 
-// Stop selection drag and set loop markers
+/**
+ * Stops selection drag and sets loop markers if selection is valid
+ */
 const stopSelectionDrag = (event) => {
   if (!isDraggingSelection.value || !progressWrapper.value || !props.duration || !event) {
     cleanupSelectionDrag()
@@ -389,17 +425,21 @@ const stopSelectionDrag = (event) => {
   if (dragStartTime.value !== null && endTime !== null) {
     const startTime = Math.min(dragStartTime.value, endTime)
     const finalEndTime = Math.max(dragStartTime.value, endTime)
+    const selectionDuration = Math.abs(finalEndTime - startTime)
     
     // Only set if there's a meaningful selection (at least minimum duration)
-    if (Math.abs(finalEndTime - startTime) >= MIN_SELECTION_DURATION) {
-      emit('update:loopStart', Math.max(0, Math.min(startTime, props.duration)))
-      emit('update:loopEnd', Math.max(0, Math.min(finalEndTime, props.duration)))
+    if (selectionDuration >= MIN_SELECTION_DURATION) {
+      emit('update:loopStart', clamp(startTime, 0, props.duration))
+      emit('update:loopEnd', clamp(finalEndTime, 0, props.duration))
     }
   }
   
   cleanupSelectionDrag()
 }
 
+/**
+ * Resets drag selection state
+ */
 const cleanupSelectionDrag = () => {
   isDraggingSelection.value = false
   dragStartX.value = 0
@@ -409,7 +449,9 @@ const cleanupSelectionDrag = () => {
   document.body.style.cursor = ''
 }
 
-// Drag selection style computed property
+/**
+ * Computed style for drag selection overlay
+ */
 const dragSelectionStyle = computed(() => {
   if (!isDraggingSelection.value || !progressWrapper.value) {
     return { display: 'none' }
@@ -427,11 +469,18 @@ const dragSelectionStyle = computed(() => {
   }
 })
 
-// Drag handlers for loop markers
+// Loop marker drag handlers
+/**
+ * Starts dragging a loop marker
+ * @param {'start' | 'end'} marker
+ * @param {MouseEvent | TouchEvent} event
+ */
 const startDrag = (marker, event) => {
   draggingMarker.value = marker
-  const clientX = event.touches ? event.touches[0].clientX : event.clientX
-  updateMarkerPosition(clientX)
+  const clientX = getClientX(event)
+  if (clientX !== null) {
+    updateMarkerPosition(clientX)
+  }
   
   document.addEventListener('mousemove', handleDrag)
   document.addEventListener('mouseup', stopDrag)
@@ -441,53 +490,72 @@ const startDrag = (marker, event) => {
   document.body.style.cursor = 'grabbing'
 }
 
+/**
+ * Handles marker drag movement
+ */
 const handleDrag = (event) => {
   if (!draggingMarker.value) return
-  const clientX = event.touches ? event.touches[0].clientX : event.clientX
-  updateMarkerPosition(clientX)
+  const clientX = getClientX(event)
+  if (clientX !== null) {
+    updateMarkerPosition(clientX)
+  }
 }
 
+/**
+ * Stops marker dragging
+ */
 const stopDrag = () => {
   draggingMarker.value = null
-  document.removeEventListener('mousemove', handleDrag)
-  document.removeEventListener('mouseup', stopDrag)
-  document.removeEventListener('touchmove', handleDrag)
-  document.removeEventListener('touchend', stopDrag)
-  document.body.style.userSelect = ''
-  document.body.style.cursor = ''
+  cleanupDocumentListeners({ 
+    mousemove: handleDrag, 
+    mouseup: stopDrag, 
+    touchmove: handleDrag, 
+    touchend: stopDrag 
+  })
 }
 
+/**
+ * Updates marker position based on clientX
+ * @param {number} clientX
+ */
 const updateMarkerPosition = (clientX) => {
-  if (!draggingMarker.value || !props.duration) return
-  
-  // Use progressWrapper from template ref
-  if (!progressWrapper.value) return
+  if (!draggingMarker.value || !props.duration || !progressWrapper.value) return
   
   const time = getTimeFromPosition(clientX, progressWrapper.value)
   if (time === null) return
   
   if (draggingMarker.value === 'start') {
-    const newStart = Math.max(0, Math.min(time, props.loopEnd !== null ? props.loopEnd - 0.1 : props.duration))
+    const maxStart = props.loopEnd !== null ? props.loopEnd - MIN_MARKER_SPACING : props.duration
+    const newStart = clamp(time, 0, maxStart)
     emit('update:loopStart', newStart)
   } else if (draggingMarker.value === 'end') {
-    const newEnd = Math.max(props.loopStart !== null ? props.loopStart + 0.1 : 0, Math.min(time, props.duration))
+    const minEnd = props.loopStart !== null ? props.loopStart + MIN_MARKER_SPACING : 0
+    const newEnd = clamp(time, minEnd, props.duration)
     emit('update:loopEnd', newEnd)
   }
 }
+// Lifecycle hooks
+/**
+ * Watches for canvas, duration and file changes to initialize waveform
+ */
+watch(
+  [waveformCanvas, () => props.duration, () => props.file],
+  async ([canvas, newDuration, newFile]) => {
+    if (canvas && newFile && newDuration > 0) {
+      await nextTick()
+      setTimeout(() => {
+        if (canvas?.offsetWidth > 0 && canvas?.offsetHeight > 0) {
+          initAudioContext()
+        }
+      }, WAVEFORM_INIT_DELAY)
+    }
+  },
+  { immediate: true }
+)
 
-
-// Watch for canvas, duration and file to initialize waveform
-watch([waveformCanvas, () => props.duration, () => props.file], async ([canvas, newDuration, newFile]) => {
-  if (canvas && newFile && newDuration > 0) {
-    await nextTick()
-    setTimeout(() => {
-      if (canvas && canvas.offsetWidth > 0 && canvas.offsetHeight > 0) {
-        initAudioContext()
-      }
-    }, WAVEFORM_INIT_DELAY)
-  }
-}, { immediate: true })
-
+/**
+ * Cleanup on component unmount
+ */
 onUnmounted(() => {
   stopDrag()
   cleanupSelectionDrag()
