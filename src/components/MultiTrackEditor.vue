@@ -66,6 +66,32 @@
         </svg>
         Add Track
       </button>
+      <div class="zoom-controls">
+        <button class="zoom-btn" @click="zoomOut" :disabled="zoomLevel <= 0.05" title="Zoom Out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <span class="zoom-level">{{ zoomLevel.toFixed(1) }}x</span>
+        <button class="zoom-btn" @click="zoomIn" :disabled="zoomLevel >= 4" title="Zoom In">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <button class="zoom-btn zoom-reset" @click="resetZoom" title="Reset Zoom">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+            <path d="M3 21v-5h5"></path>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div class="tracks-section">
@@ -121,7 +147,9 @@ const tracksContainerRef = ref(null)
 const tracksScrollWrapperRef = ref(null)
 const timeRulerScrollRef = ref(null)
 const isDragging = ref(false)
-const pixelsPerSecond = ref(50)
+const basePixelsPerSecond = 50
+const zoomLevel = ref(1.0)
+const pixelsPerSecond = computed(() => basePixelsPerSecond * zoomLevel.value)
 const isDraggingPlayhead = ref(false)
 const playheadDragStartTime = ref(0)
 
@@ -650,6 +678,27 @@ const goToStart = () => {
   stopAll()
 }
 
+// Zoom functionality
+const zoomIn = () => {
+  if (zoomLevel.value < 4) {
+    // Use smaller steps when zoomed out, larger steps when zoomed in
+    const step = zoomLevel.value < 1 ? 0.1 : 0.25
+    zoomLevel.value = Math.min(4, zoomLevel.value + step)
+  }
+}
+
+const zoomOut = () => {
+  if (zoomLevel.value > 0.05) {
+    // Use smaller steps when zoomed out, larger steps when zoomed in
+    const step = zoomLevel.value <= 1 ? 0.1 : 0.25
+    zoomLevel.value = Math.max(0.05, zoomLevel.value - step)
+  }
+}
+
+const resetZoom = () => {
+  zoomLevel.value = 1.0
+}
+
 // Playhead dragging
 const handlePlayheadDragStart = (event) => {
   event.preventDefault()
@@ -801,6 +850,58 @@ watch(uploadedFiles, (newFiles) => {
   display: flex;
   align-items: center;
   gap: 15px;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f0f2ff;
+  border-radius: 8px;
+}
+
+.zoom-btn {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #667eea;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.zoom-btn:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.zoom-level {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #333;
+  min-width: 40px;
+  text-align: center;
+}
+
+.zoom-reset {
+  margin-left: 4px;
 }
 
 .master-volume-control {
@@ -971,6 +1072,9 @@ watch(uploadedFiles, (newFiles) => {
   padding: 10px 20px;
   background: white;
   border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
 .tracks-container {
