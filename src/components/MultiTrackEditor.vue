@@ -264,9 +264,10 @@ const timeMarkers = computed(() => {
 
 // Handle time ruler click to seek
 const handleTimeRulerClick = (event) => {
+  event.stopPropagation()
   const ruler = event.currentTarget
   const rect = ruler.getBoundingClientRect()
-  const scrollWrapper = tracksScrollWrapperRef.value
+  const scrollWrapper = timeRulerScrollRef.value || tracksScrollWrapperRef.value
   if (!scrollWrapper) return
   
   const scrollLeft = scrollWrapper.scrollLeft
@@ -567,12 +568,9 @@ const handleBlockDelete = ({ trackIndex, blockId }) => {
 const handleVolumeChange = ({ trackIndex, volume }) => {
   const track = tracks.value[trackIndex]
   if (track) {
-    track.volume = volume
-    // Update volume for all blocks in this track
-    const trackBlocks = blocks.value.filter(b => b.trackId === track.id)
-    trackBlocks.forEach(block => {
-      setVolume(block.trackId, track.isMuted ? 0 : volume)
-    })
+    track.volume = volume // Store as 0-1 range
+    // Update volume for all blocks in this track - setVolume uses trackId
+    setVolume(track.id, track.isMuted ? 0 : volume)
   }
 }
 
@@ -580,10 +578,9 @@ const handleMuteToggle = ({ trackIndex, isMuted }) => {
   const track = tracks.value[trackIndex]
   if (track) {
     track.isMuted = isMuted
-    const trackBlocks = blocks.value.filter(b => b.trackId === track.id)
-    trackBlocks.forEach(block => {
-      setVolume(block.trackId, isMuted ? 0 : track.volume)
-    })
+    // Update volume for all blocks in this track - use track.volume which is already in 0-1 range
+    const volumeToSet = isMuted ? 0 : (track.volume || 1)
+    setVolume(track.id, volumeToSet)
   }
 }
 
@@ -1118,6 +1115,7 @@ watch(uploadedFiles, (newFiles) => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  pointer-events: none; /* Allow clicks to pass through to ruler */
 }
 
 .time-tick {
@@ -1125,6 +1123,7 @@ watch(uploadedFiles, (newFiles) => {
   height: 12px;
   background: #999;
   margin-top: 4px;
+  pointer-events: none;
 }
 
 .time-label {
@@ -1133,6 +1132,7 @@ watch(uploadedFiles, (newFiles) => {
   margin-top: 2px;
   white-space: nowrap;
   font-weight: 500;
+  pointer-events: none;
 }
 
 .tracks-scroll-wrapper {

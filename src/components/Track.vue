@@ -38,8 +38,8 @@
           <button 
             class="track-btn track-mute"
             :class="{ active: isMuted }"
-            @click="toggleMute"
-            :title="isMuted ? 'Unmute' : 'Mute'"
+            @click.stop="toggleMute"
+            :title="isMuted ? 'Unmute track' : 'Mute track'"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path v-if="!isMuted" d="M11 5L6 9H2v6h4l5 4V5zM19 9l-6 6M13 9l6 6"/>
@@ -348,6 +348,13 @@ const toggleMute = () => {
   background: #ff6b6b;
   border-color: #ff6b6b;
   color: white;
+}
+
+.track-btn.track-mute.active {
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+  color: white;
+  box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
 }
 
 .track-btn svg {
