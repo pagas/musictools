@@ -139,7 +139,6 @@ const props = defineProps({
 
 const emit = defineEmits(['seek', 'update:loopStart', 'update:loopEnd'])
 
-const waveformViewerRef = ref(null)
 const progressWrapper = ref(null)
 const draggingMarker = ref(null)
 const waveformCanvas = ref(null)
@@ -158,7 +157,6 @@ const {
   scrollbarValue,
   visibleStartTime,
   visibleEndTime,
-  visibleDurationTime,
   zoomIn: zoomInFn,
   zoomOut: zoomOutFn,
   resetZoom: resetZoomFn,
@@ -569,39 +567,6 @@ const updateMarkerPosition = (clientX) => {
   }
 }
 
-const handleMarkerMouseDown = (event) => {
-  if (!draggingMarker.value && event.target === progressWrapper.value) {
-    const time = getTimeFromPosition(event.clientX, progressWrapper.value)
-    if (time !== null) {
-      if (props.loopStart !== null && props.loopEnd !== null) {
-        const distToStart = Math.abs(time - props.loopStart)
-        const distToEnd = Math.abs(time - props.loopEnd)
-        if (distToStart < distToEnd && time < props.loopEnd) {
-          emit('update:loopStart', Math.max(0, Math.min(time, props.loopEnd - 0.1)))
-        } else if (time > props.loopStart) {
-          emit('update:loopEnd', Math.max(props.loopStart + 0.1, Math.min(time, props.duration)))
-        }
-      }
-    }
-  }
-}
-
-const handleMarkerTouchStart = (event) => {
-  if (!draggingMarker.value && event && event.target === progressWrapper.value && event.touches && event.touches.length > 0) {
-    const time = getTimeFromPositionLocal(event.touches[0].clientX)
-    if (time !== null) {
-      if (props.loopStart !== null && props.loopEnd !== null) {
-        const distToStart = Math.abs(time - props.loopStart)
-        const distToEnd = Math.abs(time - props.loopEnd)
-        if (distToStart < distToEnd && time < props.loopEnd) {
-          emit('update:loopStart', Math.max(0, Math.min(time, props.loopEnd - 0.1)))
-        } else if (time > props.loopStart) {
-          emit('update:loopEnd', Math.max(props.loopStart + 0.1, Math.min(time, props.duration)))
-        }
-      }
-    }
-  }
-}
 
 // Watch for canvas, duration and file to initialize waveform
 watch([waveformCanvas, () => props.duration, () => props.file], async ([canvas, newDuration, newFile]) => {
