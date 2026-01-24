@@ -31,6 +31,26 @@
         </div>
       </div>
 
+      <!-- Instrument Filter -->
+      <div class="instrument-filter">
+        <button 
+          class="filter-btn" 
+          :class="{ active: selectedInstrument === null }"
+          @click="selectedInstrument = null"
+        >
+          All
+        </button>
+        <button 
+          v-for="inst in instruments" 
+          :key="inst"
+          class="filter-btn"
+          :class="{ active: selectedInstrument === inst }"
+          @click="selectedInstrument = inst"
+        >
+          {{ inst }}
+        </button>
+      </div>
+
       <!-- Song Strip Overview -->
       <div class="song-strip">
         <div 
@@ -56,16 +76,26 @@
       >
         <div class="section-header">
           <div class="section-title">
-            <h3>{{ section.name }}</h3>
-            <span class="bar-count">{{ section.bars }} Bars</span>
+            <input v-model="section.name" class="name-input" placeholder="Section Name" />
+            <div class="bar-control">
+              <button class="bar-btn" @click="decrementBars(section)" :disabled="section.bars <= 1" title="Remove Bar">−</button>
+              <input v-model.number="section.bars" type="number" min="1" class="bar-input" />
+              <button class="bar-btn" @click="incrementBars(section)" title="Add Bar">+</button>
+              <span>Bars</span>
+            </div>
           </div>
-          <div class="section-instructions" v-if="section.instructions">
-            {{ section.instructions }}
+          <div class="section-actions">
+            <div class="section-instructions" v-if="section.instructions">
+              {{ section.instructions }}
+            </div>
+            <button class="btn-remove" @mousedown.stop="removeSection(index)" @touchstart.stop="removeSection(index)" title="Remove Section">
+              🗑️
+            </button>
           </div>
         </div>
 
         <div class="instruments-grid">
-          <div v-for="inst in instruments" :key="inst" class="instrument-row">
+          <div v-for="inst in visibleInstruments" :key="inst" class="instrument-row">
             <div class="instrument-name">{{ inst }}</div>
             <div class="pattern-map">
               <div 
@@ -131,6 +161,14 @@ const song = ref({
 })
 
 const instruments = ref(['Drums', 'Bass', 'Guitar', 'Keys'])
+const selectedInstrument = ref(null)
+
+const visibleInstruments = computed(() => {
+  if (selectedInstrument.value) {
+    return [selectedInstrument.value]
+  }
+  return instruments.value
+})
 
 const currentSectionIndex = ref(0)
 const currentBar = ref(1) // 1-based index within section
@@ -276,6 +314,23 @@ const addSection = () => {
     patterns: {}
   })
 }
+
+const removeSection = (index) => {
+  // Use a simple confirm for now, but ensure we're not inside a loop that might cause issues
+  if (window.confirm('Are you sure you want to remove this section?')) {
+    song.value.sections.splice(index, 1)
+  }
+}
+
+const incrementBars = (section) => {
+  section.bars = (section.bars || 1) + 1
+}
+
+const decrementBars = (section) => {
+  if (section.bars > 1) {
+    section.bars = section.bars - 1
+  }
+}
 </script>
 
 <style scoped>
@@ -353,6 +408,39 @@ const addSection = () => {
   margin-top: 4px;
 }
 
+.instrument-filter {
+  display: flex;
+  gap: 8px;
+  padding: 8px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.filter-btn {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  background: white;
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  background: #f0f2f5;
+  color: #333;
+}
+
+.filter-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
 /* Song Strip */
 .song-strip {
   display: flex;
@@ -421,19 +509,96 @@ const addSection = () => {
   padding-bottom: 12px;
 }
 
-.section-title h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: #2d3748;
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.bar-count {
+.name-input {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #2d3748;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  width: auto;
+  min-width: 150px;
+  font-family: inherit;
+}
+
+.name-input:hover, .name-input:focus {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.bar-control {
+  display: flex;
+  align-items: center;
+  background: #edf2f7;
+  padding: 2px;
+  border-radius: 4px;
   font-size: 0.9rem;
   color: #718096;
-  background: #edf2f7;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-left: 10px;
+  gap: 2px;
+}
+
+.bar-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(255,255,255,0.5);
+  color: #718096;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.bar-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.8);
+  color: #4a5568;
+}
+
+.bar-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.bar-input {
+  width: 40px;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-weight: 600;
+  color: inherit;
+  font-family: inherit;
+  padding: 0 2px;
+  -moz-appearance: textfield;
+}
+
+.bar-input::-webkit-outer-spin-button,
+.bar-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.bar-input:focus {
+  outline: none;
+  background: rgba(255,255,255,0.5);
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .section-instructions {
@@ -444,6 +609,23 @@ const addSection = () => {
   border-radius: 6px;
   border: 1px solid #fef3c7;
   font-size: 0.9rem;
+}
+
+.btn-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.btn-remove:hover {
+  opacity: 1;
+  background: #fff5f5;
+  transform: scale(1.1);
 }
 
 /* Instruments Grid */
