@@ -231,7 +231,7 @@ const getPatternClass = (section, instrument, bar) => {
 const getPatternIcon = (section, instrument, bar) => {
   const pattern = section.patterns[instrument]?.[bar] || 'play'
   switch (pattern) {
-    case 'rest': return 'Job' // Using text/emoji for now
+    case 'rest': return '—' // Rest symbol (em dash)
     case 'fill': return '⚡'
     case 'play': return '●'
     default: return '●'
