@@ -25,7 +25,7 @@
             <span class="label">CURRENT</span>
             <span class="value">{{ currentSection.name }}</span>
             <div class="bar-progress">
-              Bar {{ currentBar }} / {{ currentSection.bars }}
+              Bar {{ currentBar }} / {{ currentSection.bars }} • Beat {{ currentBeat }} / {{ beatsPerBar }}
             </div>
           </div>
         </div>
@@ -101,12 +101,21 @@
               <div 
                 v-for="bar in section.bars" 
                 :key="bar" 
-                class="bar-block"
-                :class="getPatternClass(section, inst, bar)"
-                @click="togglePattern(section, inst, bar)"
+                class="bar-container"
               >
-                <!-- Visual indicator of pattern type -->
-                <span class="pattern-icon">{{ getPatternIcon(section, inst, bar) }}</span>
+                <div class="bar-label">{{ bar }}</div>
+                <div class="bar-beats">
+                  <div 
+                    v-for="beat in beatsPerBar" 
+                    :key="beat" 
+                    class="beat-block"
+                    :class="getPatternClass(section, inst, bar, beat)"
+                    @click="togglePattern(section, inst, bar, beat)"
+                    :title="`Bar ${bar}, Beat ${beat}`"
+                  >
+                    <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -137,9 +146,9 @@ const song = ref({
       bars: 4,
       instructions: 'Build up slowly',
       patterns: {
-        'Drums': { 1: 'play', 2: 'play', 3: 'play', 4: 'fill' },
-        'Bass': { 1: 'rest', 2: 'rest', 3: 'play', 4: 'play' },
-        'Guitar': { 1: 'play', 2: 'play', 3: 'play', 4: 'play' }
+        'Drums': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'fill' },
+        'Bass': { '1-1': 'rest', '1-2': 'rest', '1-3': 'play', '1-4': 'play' },
+        'Guitar': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'play' }
       }
     },
     {
@@ -147,8 +156,7 @@ const song = ref({
       bars: 8,
       instructions: 'Tight groove',
       patterns: {
-        'Drums': { 8: 'fill' }, // Default to 'play' if not specified? Or 'rest'? Let's assume 'play' is default or we store sparse.
-                               // Better to store sparse for now.
+        'Drums': { '8-4': 'fill' } // Fill on beat 4 of bar 8
       }
     },
     {
@@ -172,11 +180,18 @@ const visibleInstruments = computed(() => {
 
 const currentSectionIndex = ref(0)
 const currentBar = ref(1) // 1-based index within section
+const currentBeat = ref(1) // 1-based index within bar
 const isPlaying = ref(false)
 let playbackInterval = null
 
 const currentSection = computed(() => {
   return song.value.sections[currentSectionIndex.value]
+})
+
+// Calculate beats per bar from time signature
+const beatsPerBar = computed(() => {
+  const [beats] = song.value.timeSignature.split('/').map(Number)
+  return beats || 4 // Default to 4 if parsing fails
 })
 
 const togglePlay = () => {
@@ -190,28 +205,32 @@ const togglePlay = () => {
 const play = () => {
   isPlaying.value = true
   const msPerBeat = 60000 / song.value.bpm
-  const beatsPerBar = parseInt(song.value.timeSignature.split('/')[0])
-  const msPerBar = msPerBeat * beatsPerBar
   
   playbackInterval = setInterval(() => {
-    // Advance bar
-    if (currentBar.value < currentSection.value.bars) {
-      currentBar.value++
+    // Advance beat
+    if (currentBeat.value < beatsPerBar.value) {
+      currentBeat.value++
     } else {
-      // Next section
-      if (currentSectionIndex.value < song.value.sections.length - 1) {
-        currentSectionIndex.value++
-        currentBar.value = 1
-        scrollToSection(currentSectionIndex.value)
+      // Move to next bar
+      currentBeat.value = 1
+      if (currentBar.value < currentSection.value.bars) {
+        currentBar.value++
       } else {
-        // End of song
-        pause()
-        currentBar.value = 1
-        currentSectionIndex.value = 0
-        scrollToSection(0)
+        // Next section
+        if (currentSectionIndex.value < song.value.sections.length - 1) {
+          currentSectionIndex.value++
+          currentBar.value = 1
+          currentBeat.value = 1
+          scrollToSection(currentSectionIndex.value)
+        } else {
+          // End of song
+          pause()
+          resetPlayback()
+          scrollToSection(0)
+        }
       }
     }
-  }, msPerBar)
+  }, msPerBeat)
 }
 
 const pause = () => {
@@ -222,14 +241,23 @@ const pause = () => {
   }
 }
 
-// Helper to get pattern status
-const getPatternClass = (section, instrument, bar) => {
-  const pattern = section.patterns[instrument]?.[bar] || 'play' // Default to play? Or rest?
+// Reset playback position
+const resetPlayback = () => {
+  currentBar.value = 1
+  currentBeat.value = 1
+  currentSectionIndex.value = 0
+}
+
+// Helper to get pattern status for a specific beat
+const getPatternClass = (section, instrument, bar, beat) => {
+  const patternKey = `${bar}-${beat}`
+  const pattern = section.patterns[instrument]?.[patternKey] || 'play'
   return `pattern-${pattern}`
 }
 
-const getPatternIcon = (section, instrument, bar) => {
-  const pattern = section.patterns[instrument]?.[bar] || 'play'
+const getPatternIcon = (section, instrument, bar, beat) => {
+  const patternKey = `${bar}-${beat}`
+  const pattern = section.patterns[instrument]?.[patternKey] || 'play'
   switch (pattern) {
     case 'rest': return '—' // Rest symbol (em dash)
     case 'fill': return '⚡'
@@ -238,19 +266,20 @@ const getPatternIcon = (section, instrument, bar) => {
   }
 }
 
-const togglePattern = (section, instrument, bar) => {
+const togglePattern = (section, instrument, bar, beat) => {
   if (!section.patterns[instrument]) {
     section.patterns[instrument] = {}
   }
   
-  const current = section.patterns[instrument][bar] || 'play'
+  const patternKey = `${bar}-${beat}`
+  const current = section.patterns[instrument][patternKey] || 'play'
   const next = {
     'play': 'rest',
     'rest': 'fill',
     'fill': 'play'
   }[current]
   
-  section.patterns[instrument][bar] = next
+  section.patterns[instrument][patternKey] = next
 }
 
 const scrollToSection = (index) => {
@@ -650,26 +679,51 @@ const decrementBars = (section) => {
 .pattern-map {
   flex: 1;
   display: flex;
-  gap: 4px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.bar-block {
-  width: 32px;
-  height: 32px;
+.bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.bar-label {
+  font-size: 0.7rem;
+  color: #a0aec0;
+  font-weight: 600;
+  text-align: center;
+  min-width: 20px;
+}
+
+.bar-beats {
+  display: flex;
+  gap: 2px;
+  background: #f7fafc;
+  padding: 2px;
   border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.beat-block {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
   background: #edf2f7;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #a0aec0;
 }
 
-.bar-block:hover {
-  transform: translateY(-2px);
+.beat-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .pattern-play {
