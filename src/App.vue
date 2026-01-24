@@ -27,15 +27,22 @@
       >
         🎛️ Multi-Track Editor
       </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'performance' }"
+        @click="activeTab = 'performance'"
+      >
+        📜 Performance View
+      </button>
     </nav>
 
     <main>
       <FileUpload
-        v-if="!currentFile && activeTab !== 'multitrack'"
+        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance'"
         @file-selected="handleFileSelected"
       />
       
-      <div v-if="currentFile && activeTab !== 'multitrack'" class="file-info">
+      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <button class="btn-change" @click="changeFile">Change File</button>
       </div>
@@ -53,6 +60,10 @@
       <MultiTrackEditor
         v-if="activeTab === 'multitrack'"
       />
+
+      <SongPerformanceView
+        v-if="activeTab === 'performance'"
+      />
     </main>
   </div>
 </template>
@@ -63,6 +74,7 @@ import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
 import MusicAnalyzer from './components/MusicAnalyzer.vue'
 import MultiTrackEditor from './components/MultiTrackEditor.vue'
+import SongPerformanceView from './components/SongPerformanceView.vue'
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
