@@ -173,6 +173,7 @@ export function useMultiTrack() {
     currentTime,
     initAudioContext,
     loadAudioFile,
+    createGainNode,
     playBlock,
     stopBlock,
     setVolume,

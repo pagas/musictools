@@ -36,6 +36,14 @@
         />
         <div class="track-controls">
           <button 
+            class="track-btn track-solo"
+            :class="{ active: isSoloed }"
+            @click.stop="toggleSolo"
+            :title="isSoloed ? 'Unsolo track' : 'Solo track'"
+          >
+            S
+          </button>
+          <button 
             class="track-btn track-mute"
             :class="{ active: isMuted }"
             @click.stop="toggleMute"
@@ -94,10 +102,14 @@ const props = defineProps({
   playingBlocks: {
     type: Set,
     default: () => new Set()
+  },
+  isSoloed: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['drop-block', 'update-name', 'delete', 'block-drag-start', 'block-drag-move', 'block-drag-end', 'block-delete', 'volume-change', 'mute-toggle'])
+const emit = defineEmits(['drop-block', 'update-name', 'delete', 'block-drag-start', 'block-drag-move', 'block-drag-end', 'block-delete', 'volume-change', 'mute-toggle', 'solo-toggle'])
 
 const trackContentRef = ref(null)
 const trackRef = ref(null)
@@ -264,6 +276,13 @@ const toggleMute = () => {
     isMuted: isMuted.value
   })
 }
+
+const toggleSolo = () => {
+  emit('solo-toggle', {
+    trackIndex: props.trackIndex,
+    isSoloed: !props.isSoloed
+  })
+}
 </script>
 
 <style scoped>
@@ -359,6 +378,13 @@ const toggleMute = () => {
   border-color: #ff6b6b;
   color: white;
   box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
+}
+
+.track-btn.track-solo.active {
+  background: #fcc419;
+  border-color: #fcc419;
+  color: white;
+  box-shadow: 0 0 4px rgba(253, 196, 25, 0.5);
 }
 
 .track-btn svg {

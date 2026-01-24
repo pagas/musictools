@@ -143,10 +143,11 @@
             ></div>
             <Track v-for="(track, index) in tracks" :key="track.id" :trackIndex="index" :name="track.name"
               :blocks="getBlocksForTrack(track.id)" :pixelsPerSecond="pixelsPerSecond" :playingBlocks="playingBlocks"
+              :isSoloed="track.isSoloed"
               @drop-block="handleDropBlock" @update-name="handleTrackNameUpdate" @delete="handleTrackDelete"
               @block-drag-start="handleBlockDragStart" @block-drag-move="handleBlockDragMove"
               @block-drag-end="handleBlockDragEnd" @block-delete="handleBlockDelete" @volume-change="handleVolumeChange"
-              @mute-toggle="handleMuteToggle" />
+              @mute-toggle="handleMuteToggle" @solo-toggle="handleSoloToggle" />
           </div>
         </div>
       </div>
@@ -220,6 +221,7 @@ const isRepeating = ref(false)
 // Multi-track audio
 const {
   loadAudioFile,
+  createGainNode,
   playBlock,
   stopBlock,
   stopAll,
@@ -269,6 +271,11 @@ onMounted(() => {
     addTrack()
     addTrack()
     addTrack()
+  } else {
+    // Ensure gain nodes exist for existing tracks
+    tracks.value.forEach(track => {
+      createGainNode(track.id)
+    })
   }
   // Initialize master volume
   setMasterVolume(masterVolume.value / 100)
@@ -520,12 +527,16 @@ const processFiles = async (files) => {
 
 // Track management
 const addTrack = () => {
+  const newTrackId = generateTrackId()
   tracks.value.push({
-    id: generateTrackId(),
+    id: newTrackId,
     name: `Track ${tracks.value.length + 1}`,
     volume: 1,
-    isMuted: false
+    isMuted: false,
+    isSoloed: false
   })
+  // Initialize gain node for the new track
+  createGainNode(newTrackId)
 }
 
 const handleTrackNameUpdate = ({ trackIndex, name }) => {
@@ -962,18 +973,49 @@ const handleVolumeChange = ({ trackIndex, volume }) => {
   const track = tracks.value[trackIndex]
   if (track) {
     track.volume = volume // Store as 0-1 range
-    // Update volume for all blocks in this track - setVolume uses trackId
-    setVolume(track.id, track.isMuted ? 0 : volume)
+    updateAllTrackVolumes()
   }
+}
+
+const updateAllTrackVolumes = () => {
+  const anySoloed = tracks.value.some(t => t.isSoloed)
+  
+  tracks.value.forEach(track => {
+    let shouldPlay = true
+    
+    if (anySoloed) {
+      shouldPlay = track.isSoloed
+    } else {
+      shouldPlay = !track.isMuted
+    }
+    
+    const volumeToSet = shouldPlay ? (track.volume || 1) : 0
+    setVolume(track.id, volumeToSet)
+  })
 }
 
 const handleMuteToggle = ({ trackIndex, isMuted }) => {
   const track = tracks.value[trackIndex]
   if (track) {
     track.isMuted = isMuted
-    // Update volume for all blocks in this track - use track.volume which is already in 0-1 range
-    const volumeToSet = isMuted ? 0 : (track.volume || 1)
-    setVolume(track.id, volumeToSet)
+    updateAllTrackVolumes()
+  }
+}
+
+const handleSoloToggle = ({ trackIndex, isSoloed }) => {
+  if (isSoloed) {
+    // If turning solo ON, turn off solo for all other tracks
+    tracks.value.forEach((track, index) => {
+      if (index !== trackIndex) {
+        track.isSoloed = false
+      }
+    })
+  }
+  
+  const track = tracks.value[trackIndex]
+  if (track) {
+    track.isSoloed = isSoloed
+    updateAllTrackVolumes()
   }
 }
 
@@ -999,10 +1041,14 @@ const play = async () => {
   const startTimestamp = Date.now()
   playbackStartTime.value = currentTime.value
 
+  // Ensure volumes are correct before starting
+  updateAllTrackVolumes()
+
   // Play all blocks that should be playing at current time
   for (const block of blocks.value) {
     const track = tracks.value.find(t => t.id === block.trackId)
-    if (track && !track.isMuted) {
+    
+    if (track) {
       // Only play blocks that haven't started yet or are currently playing
       const blockStartTime = block.startTime
       const blockEndTime = block.startTime + block.duration
