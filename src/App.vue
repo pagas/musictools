@@ -1,8 +1,36 @@
 <template>
-  <div class="container">
+  <!-- Show login if not authenticated -->
+  <LoginView v-if="!isAuthenticated && !loading" />
+
+  <!-- Show loading state -->
+  <div v-else-if="loading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading...</p>
+  </div>
+
+  <!-- Main app when authenticated -->
+  <div v-else class="container">
     <header>
-      <h1>🎵 Music Tools</h1>
-      <p class="subtitle">Upload and analyze or slow down your music</p>
+      <div class="header-content">
+        <div>
+          <h1>🎵 Music Tools</h1>
+          <p class="subtitle">Upload and analyze or slow down your music</p>
+        </div>
+        <div class="user-info">
+          <div class="user-details">
+            <img 
+              v-if="user?.photoURL" 
+              :src="user.photoURL" 
+              :alt="user.displayName || 'User'"
+              class="user-avatar"
+            />
+            <span class="user-name">{{ user?.displayName || user?.email }}</span>
+          </div>
+          <button class="btn-logout" @click="handleLogout" title="Sign out">
+            Sign Out
+          </button>
+        </div>
+      </div>
     </header>
 
     <nav class="tabs">
@@ -24,6 +52,8 @@
         class="tab-btn" 
         :class="{ active: activeTab === 'multitrack' }"
         @click="activeTab = 'multitrack'"
+        :disabled="!isAuthenticated"
+        :title="!isAuthenticated ? 'Sign in required' : ''"
       >
         🎛️ Multi-Track Editor
       </button>
@@ -31,6 +61,8 @@
         class="tab-btn" 
         :class="{ active: activeTab === 'performance' }"
         @click="activeTab = 'performance'"
+        :disabled="!isAuthenticated"
+        :title="!isAuthenticated ? 'Sign in required' : ''"
       >
         📜 Performance View
       </button>
@@ -58,32 +90,51 @@
       />
 
       <MultiTrackEditor
-        v-if="activeTab === 'multitrack'"
+        v-if="activeTab === 'multitrack' && isAuthenticated"
       />
 
       <SongPerformanceView
-        v-if="activeTab === 'performance'"
+        v-if="activeTab === 'performance' && isAuthenticated"
       />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useAuth } from './composables/useAuth'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
 import MusicAnalyzer from './components/MusicAnalyzer.vue'
 import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
+import LoginView from './components/LoginView.vue'
+
+const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
+
+const isAuthenticated = computed(() => checkAuth())
+
+// Protect routes - redirect to slowdowner if trying to access protected tabs without auth
+watch([isAuthenticated, activeTab], ([authenticated, tab]) => {
+  if (!authenticated && (tab === 'multitrack' || tab === 'performance')) {
+    activeTab.value = 'slowdowner'
+  }
+})
 
 const handleFileSelected = (file) => {
   currentFile.value = file
 }
 
 const changeFile = () => {
+  currentFile.value = null
+}
+
+const handleLogout = async () => {
+  await logout()
+  activeTab.value = 'slowdowner'
   currentFile.value = null
 }
 </script>
@@ -102,7 +153,14 @@ header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 40px;
-  text-align: center;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 header h1 {
@@ -114,6 +172,71 @@ header h1 {
 .subtitle {
   opacity: 0.9;
   font-size: 1.1em;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-details {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.btn-logout {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.loading-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 main {
@@ -195,6 +318,13 @@ main {
 .tab-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  position: relative;
+}
+
+.tab-btn:disabled::after {
+  content: '🔒';
+  margin-left: 6px;
+  font-size: 0.8em;
 }
 
 .multitrack-wrapper {
@@ -213,6 +343,17 @@ main {
 
   header {
     padding: 25px 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .user-info {
+    width: 100%;
+    justify-content: center;
+    margin-top: 20px;
   }
 
   header h1 {

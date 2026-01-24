@@ -1,38 +1,101 @@
 <template>
   <div class="performance-view">
-    <!-- Sticky Header -->
-    <header class="sticky-header">
-      <div class="header-top">
-        <div class="song-info">
-          <h2>{{ song.title }}</h2>
-          <div class="meta-info">
-            <span class="bpm">
-              <span class="label">BPM</span>
-              <span class="value">{{ song.bpm }}</span>
+    <!-- Song List View -->
+    <div v-if="showSongList" class="song-list-view">
+      <div class="song-list-header">
+        <h1>My Songs</h1>
+        <button class="btn-create-song" @click="createNewSong">
+          + Create New Song
+        </button>
+      </div>
+      
+      <div class="songs-grid">
+        <div 
+          v-for="songItem in songs" 
+          :key="songItem.id"
+          class="song-card"
+          @click="openSong(songItem.id)"
+        >
+          <div class="song-card-header">
+            <h3>{{ songItem.title }}</h3>
+            <button 
+              class="btn-delete-song" 
+              @click.stop="deleteSong(songItem.id)"
+              title="Delete Song"
+            >
+              🗑️
+            </button>
+          </div>
+          <div class="song-card-meta">
+            <span>BPM: {{ songItem.bpm }}</span>
+            <span>Time: {{ songItem.timeSignature }}</span>
+            <span>{{ songItem.sections.length }} sections</span>
+          </div>
+          <div class="song-card-sections">
+            <span 
+              v-for="(section, index) in songItem.sections.slice(0, 3)" 
+              :key="index"
+              class="section-tag"
+            >
+              {{ section.name }}
             </span>
-            <span class="time-sig">
-              <span class="label">SIG</span>
-              <span class="value">{{ song.timeSignature }}</span>
+            <span v-if="songItem.sections.length > 3" class="section-tag more">
+              +{{ songItem.sections.length - 3 }} more
             </span>
           </div>
         </div>
-        
-        <div class="current-section-display" v-if="currentSection">
-          <button class="btn-play" @click="togglePlay">
-            {{ isPlaying ? '⏸' : '▶' }}
+      </div>
+      
+      <div v-if="songs.length === 0" class="empty-state">
+        <p>No songs yet. Create your first song to get started!</p>
+      </div>
+    </div>
+
+    <!-- Song Editor View -->
+    <div v-else-if="!showSongList" class="song-editor-view">
+      <!-- Sticky Header -->
+      <header class="sticky-header">
+      <div class="header-top">
+        <div class="song-info">
+          <button class="btn-back" @click="selectedSongId = null" title="Back to Songs">
+            ← Back
           </button>
-          <div class="section-info-display">
-            <span class="label">CURRENT</span>
-            <span class="value">{{ currentSection.name }}</span>
-            <div class="bar-progress">
-              Bar {{ currentBar }} / {{ currentSection.bars }} • Beat {{ currentBeat }} / {{ beatsPerBar }}
+          <div v-if="song">
+            <h2>{{ song.title }}</h2>
+            <div class="meta-info">
+              <span class="bpm">
+                <span class="label">BPM</span>
+                <span class="value">{{ song.bpm }}</span>
+              </span>
+              <span class="time-sig">
+                <span class="label">SIG</span>
+                <span class="value">{{ song.timeSignature }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="header-actions">
+          <button class="btn-preview" @click="showPreview = true" title="Preview">
+            👁️ Preview
+          </button>
+          <div class="current-section-display" v-if="currentSection">
+            <button class="btn-play" @click="togglePlay">
+              {{ isPlaying ? '⏸' : '▶' }}
+            </button>
+            <div class="section-info-display">
+              <span class="label">CURRENT</span>
+              <span class="value">{{ currentSection.name }}</span>
+              <div class="bar-progress">
+                Bar {{ currentBar }} / {{ currentSection.bars }} • Beat {{ currentBeat }} / {{ beatsPerBar }}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Instrument Filter -->
-      <div class="instrument-filter">
+      <div class="instrument-filter" v-if="song">
         <button 
           class="filter-btn" 
           :class="{ active: selectedInstrument === null }"
@@ -52,7 +115,7 @@
       </div>
 
       <!-- Song Strip Overview -->
-      <div class="song-strip">
+      <div class="song-strip" v-if="song">
         <div 
           v-for="(section, index) in song.sections" 
           :key="index"
@@ -66,7 +129,7 @@
     </header>
 
     <!-- Main Scrollable Body -->
-    <div class="sections-container" ref="sectionsContainer">
+    <div class="sections-container" ref="sectionsContainer" v-if="song">
       <div 
         v-for="(section, index) in song.sections" 
         :key="index" 
@@ -135,43 +198,164 @@
         </button>
       </div>
     </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div v-if="showPreview && song" class="preview-modal" @click.self="showPreview = false">
+      <div class="preview-content">
+        <div class="preview-header">
+          <div class="preview-title">
+            <h2>{{ song.title }}</h2>
+            <div class="preview-meta">
+              <span>BPM: {{ song.bpm }}</span>
+              <span>Time: {{ song.timeSignature }}</span>
+            </div>
+          </div>
+          <button class="btn-close" @click="showPreview = false" title="Close Preview">
+            ✕
+          </button>
+        </div>
+        
+        <!-- Song Strip (Sticky) -->
+        <div class="preview-song-strip" v-if="song">
+          <div 
+            v-for="(section, index) in song.sections" 
+            :key="index"
+            class="preview-strip-segment"
+            :style="{ flex: section.bars }"
+          >
+            <span class="preview-strip-name">{{ section.name }}</span>
+            <span class="preview-strip-bars">{{ section.bars }} bars</span>
+          </div>
+        </div>
+
+        <!-- Preview Sections Container -->
+        <div class="preview-sections-container">
+          <div 
+            v-for="(section, index) in song.sections" 
+            :key="index" 
+            class="preview-section-card"
+          >
+            <div class="preview-section-header">
+              <h3 class="preview-section-name">{{ section.name }}</h3>
+              <div class="preview-section-meta">
+                <span>{{ section.bars }} bars</span>
+                <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
+              </div>
+            </div>
+
+            <div class="preview-instruments-grid">
+              <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
+                <div class="preview-instrument-name">{{ inst }}</div>
+                <div class="preview-pattern-map">
+                  <div 
+                    v-for="(row, rowIndex) in getBarRows(section.bars)" 
+                    :key="rowIndex"
+                    class="preview-bar-row"
+                  >
+                    <div 
+                      v-for="bar in row" 
+                      :key="bar" 
+                      class="preview-bar-container"
+                    >
+                      <div class="preview-bar-label">{{ bar }}</div>
+                      <div class="preview-bar-beats">
+                        <div 
+                          v-for="beat in beatsPerBar" 
+                          :key="beat" 
+                          class="preview-beat-block"
+                          :class="getPatternClass(section, inst, bar, beat)"
+                          :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`"
+                        >
+                          <span class="preview-pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 
-// Mock Data
-const song = ref({
-  title: 'Summer Groove',
+// Songs management
+let nextSongId = 1
+
+const createDefaultSong = () => ({
+  id: nextSongId++,
+  title: 'New Song',
   bpm: 120,
   timeSignature: '4/4',
   sections: [
     {
       name: 'Intro',
       bars: 4,
-      instructions: 'Build up slowly',
-      patterns: {
-        'Drums': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'fill' },
-        'Bass': { '1-1': 'rest', '1-2': 'rest', '1-3': 'play', '1-4': 'play' },
-        'Guitar': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'play' }
-      }
-    },
-    {
-      name: 'Verse 1',
-      bars: 8,
-      instructions: 'Tight groove',
-      patterns: {
-        'Drums': { '8-4': 'fill' } // Fill on beat 4 of bar 8
-      }
-    },
-    {
-      name: 'Chorus',
-      bars: 8,
-      instructions: 'Full volume',
+      instructions: '',
       patterns: {}
     }
   ]
+})
+
+const songs = ref([
+  {
+    id: nextSongId++,
+    title: 'Summer Groove',
+    bpm: 120,
+    timeSignature: '4/4',
+    sections: [
+      {
+        name: 'Intro',
+        bars: 4,
+        instructions: 'Build up slowly',
+        patterns: {
+          'Drums': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'fill' },
+          'Bass': { '1-1': 'rest', '1-2': 'rest', '1-3': 'play', '1-4': 'play' },
+          'Guitar': { '1-1': 'play', '1-2': 'play', '1-3': 'play', '1-4': 'play' }
+        }
+      },
+      {
+        name: 'Verse 1',
+        bars: 8,
+        instructions: 'Tight groove',
+        patterns: {
+          'Drums': { '8-4': 'fill' }
+        }
+      },
+      {
+        name: 'Chorus',
+        bars: 8,
+        instructions: 'Full volume',
+        patterns: {}
+      }
+    ]
+  }
+])
+
+const selectedSongId = ref(null)
+
+// Show song list when no song is selected
+const showSongList = computed(() => selectedSongId.value === null)
+
+// Current song (computed from selectedSongId)
+const song = computed({
+  get: () => {
+    if (!selectedSongId.value) return null
+    return songs.value.find(s => s.id === selectedSongId.value) || null
+  },
+  set: (value) => {
+    if (!selectedSongId.value) return
+    const index = songs.value.findIndex(s => s.id === selectedSongId.value)
+    if (index !== -1) {
+      songs.value[index] = value
+    }
+  }
 })
 
 const instruments = ref(['Drums', 'Bass', 'Guitar', 'Keys'])
@@ -188,20 +372,24 @@ const currentSectionIndex = ref(0)
 const currentBar = ref(1) // 1-based index within section
 const currentBeat = ref(1) // 1-based index within bar
 const isPlaying = ref(false)
+const showPreview = ref(false)
 let playbackInterval = null
 
 const currentSection = computed(() => {
+  if (!song.value) return null
   return song.value.sections[currentSectionIndex.value]
 })
 
 // Calculate beats per bar from time signature
 const beatsPerBar = computed(() => {
+  if (!song.value) return 4
   const [beats] = song.value.timeSignature.split('/').map(Number)
   return beats || 4 // Default to 4 if parsing fails
 })
 
 // Get bars per row from time signature (use numerator)
 const barsPerRow = computed(() => {
+  if (!song.value) return 4
   const [beats] = song.value.timeSignature.split('/').map(Number)
   return beats || 4 // Default to 4 if parsing fails
 })
@@ -225,10 +413,15 @@ const togglePlay = () => {
 }
 
 const play = () => {
+  if (!song.value) return
   isPlaying.value = true
   const msPerBeat = 60000 / song.value.bpm
   
   playbackInterval = setInterval(() => {
+    if (!song.value || !currentSection.value) {
+      pause()
+      return
+    }
     // Advance beat
     if (currentBeat.value < beatsPerBar.value) {
       currentBeat.value++
@@ -316,9 +509,55 @@ const scrollToSection = (index) => {
 let observer = null
 
 onMounted(() => {
+  // Set up observer if a song is already selected
+  if (song.value) {
+    setupObserver()
+  }
+})
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+  if (playbackInterval) {
+    clearInterval(playbackInterval)
+  }
+})
+
+// Watch for new sections to observe them
+watch(() => song.value?.sections?.length, async () => {
+  if (!song.value) return
+  await nextTick()
+  setupObserver()
+})
+
+// Watch for song selection to set up observer
+watch(() => selectedSongId.value, async () => {
+  if (selectedSongId.value) {
+    await nextTick()
+    setupObserver()
+  } else {
+    if (observer) {
+      observer.disconnect()
+      observer = null
+    }
+  }
+})
+
+// Helper function to set up the intersection observer
+const setupObserver = () => {
+  if (!song.value) return
+  
+  const container = document.querySelector('.sections-container')
+  if (!container) return
+  
+  if (observer) {
+    observer.disconnect()
+  }
+  
   const options = {
-    root: document.querySelector('.sections-container'),
-    threshold: 0.5 // Trigger when 50% of the section is visible
+    root: container,
+    threshold: 0.5
   }
 
   observer = new IntersectionObserver((entries) => {
@@ -332,33 +571,13 @@ onMounted(() => {
     })
   }, options)
 
-  // Observe all sections
   document.querySelectorAll('.section-card').forEach((section) => {
     observer.observe(section)
   })
-})
-
-onUnmounted(() => {
-  if (observer) {
-    observer.disconnect()
-  }
-  if (playbackInterval) {
-    clearInterval(playbackInterval)
-  }
-})
-
-// Watch for new sections to observe them
-watch(() => song.value.sections.length, async () => {
-  await nextTick()
-  if (observer) {
-    observer.disconnect()
-    document.querySelectorAll('.section-card').forEach((section) => {
-      observer.observe(section)
-    })
-  }
-})
+}
 
 const addSection = () => {
+  if (!song.value) return
   song.value.sections.push({
     name: 'New Section',
     bars: 4,
@@ -367,6 +586,7 @@ const addSection = () => {
 }
 
 const removeSection = (index) => {
+  if (!song.value) return
   // Use a simple confirm for now, but ensure we're not inside a loop that might cause issues
   if (window.confirm('Are you sure you want to remove this section?')) {
     song.value.sections.splice(index, 1)
@@ -380,6 +600,31 @@ const incrementBars = (section) => {
 const decrementBars = (section) => {
   if (section.bars > 1) {
     section.bars = section.bars - 1
+  }
+}
+
+// Song management functions
+const createNewSong = () => {
+  const newSong = createDefaultSong()
+  songs.value.push(newSong)
+  selectedSongId.value = newSong.id
+  resetPlayback()
+}
+
+const openSong = (songId) => {
+  selectedSongId.value = songId
+  resetPlayback()
+}
+
+const deleteSong = (songId) => {
+  if (window.confirm('Are you sure you want to delete this song?')) {
+    const index = songs.value.findIndex(s => s.id === songId)
+    if (index !== -1) {
+      songs.value.splice(index, 1)
+      if (selectedSongId.value === songId) {
+        selectedSongId.value = null
+      }
+    }
   }
 }
 </script>
@@ -407,6 +652,192 @@ const decrementBars = (section) => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-preview {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-preview:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+}
+
+.btn-back {
+  padding: 6px 12px;
+  background: #f0f2f5;
+  color: #4a5568;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 12px;
+}
+
+.btn-back:hover {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+/* Song List View */
+.song-list-view {
+  flex: 1;
+  width: 100%;
+  background: #f0f2f5;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.song-list-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #2d3748;
+}
+
+.btn-create-song {
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-create-song:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.songs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  flex: 1;
+  align-items: start;
+}
+
+.song-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+  align-self: start;
+}
+
+.song-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  border-color: #667eea;
+}
+
+.song-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.song-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2d3748;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.btn-delete-song {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.btn-delete-song:hover {
+  opacity: 1;
+  background: #fff5f5;
+  transform: scale(1.1);
+}
+
+.song-card-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: #718096;
+  flex-wrap: wrap;
+}
+
+.song-card-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.section-tag {
+  background: #eef2ff;
+  color: #667eea;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.section-tag.more {
+  background: #f7fafc;
+  color: #718096;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #718096;
+  font-size: 1.1rem;
+}
+
+.song-editor-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .song-info h2 {
@@ -788,12 +1219,259 @@ const decrementBars = (section) => {
   background: #f8f9ff;
 }
 
+/* Preview Modal */
+.preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.preview-content {
+  width: 100%;
+  height: 100%;
+  background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-header {
+  background: #fff;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 10;
+}
+
+.preview-title h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.preview-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.btn-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #f0f2f5;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.preview-song-strip {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 60px;
+  width: 100%;
+  background: #e0e0e0;
+  overflow-x: auto;
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.preview-strip-segment {
+  border-right: 1px solid rgba(255,255,255,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+  background: #d1d5db;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 4px 8px;
+  min-width: 80px;
+}
+
+.preview-strip-name {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.preview-strip-bars {
+  font-size: 0.7rem;
+  color: #888;
+  font-weight: 400;
+}
+
+.preview-sections-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  scroll-behavior: smooth;
+}
+
+.preview-section-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-left: 6px solid #667eea;
+}
+
+.preview-section-header {
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 12px;
+}
+
+.preview-section-name {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.preview-section-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+.preview-instructions {
+  font-style: italic;
+  color: #718096;
+  background: #fffbeb;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid #fef3c7;
+}
+
+.preview-instruments-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-instrument-row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.preview-instrument-name {
+  width: 100px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #4a5568;
+  padding-top: 4px;
+}
+
+.preview-pattern-map {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-bar-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.preview-bar-label {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 700;
+  text-align: center;
+  min-width: 30px;
+}
+
+.preview-bar-beats {
+  display: flex;
+  gap: 3px;
+  background: #f7fafc;
+  padding: 4px;
+  border-radius: 6px;
+  border: 2px solid #e2e8f0;
+}
+
+.preview-beat-block {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: #edf2f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: #a0aec0;
+  transition: all 0.15s;
+}
+
+.preview-pattern-icon {
+  font-size: 1rem;
+}
+
+.preview-beat-block.pattern-play {
+  background: #c3dafe;
+  color: #4c51bf;
+}
+
+.preview-beat-block.pattern-rest {
+  background: #f7fafc;
+  color: #cbd5e0;
+  border: 2px dashed #cbd5e0;
+}
+
+.preview-beat-block.pattern-fill {
+  background: #fed7e2;
+  color: #b83280;
+}
+
 /* Mobile responsive */
 @media (max-width: 600px) {
   .header-top {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
   
   .current-section-display {
@@ -802,6 +1480,22 @@ const decrementBars = (section) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .preview-header {
+    padding: 16px;
+  }
+
+  .preview-title h2 {
+    font-size: 1.2rem;
+  }
+
+  .preview-sections-container {
+    padding: 16px;
+  }
+
+  .preview-section-card {
+    padding: 16px;
   }
 }
 </style>
