@@ -99,21 +99,27 @@
             <div class="instrument-name">{{ inst }}</div>
             <div class="pattern-map">
               <div 
-                v-for="bar in section.bars" 
-                :key="bar" 
-                class="bar-container"
+                v-for="(row, rowIndex) in getBarRows(section.bars)" 
+                :key="rowIndex"
+                class="bar-row"
               >
-                <div class="bar-label">{{ bar }}</div>
-                <div class="bar-beats">
-                  <div 
-                    v-for="beat in beatsPerBar" 
-                    :key="beat" 
-                    class="beat-block"
-                    :class="getPatternClass(section, inst, bar, beat)"
-                    @click="togglePattern(section, inst, bar, beat)"
-                    :title="`Bar ${bar}, Beat ${beat}`"
-                  >
-                    <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                <div 
+                  v-for="bar in row" 
+                  :key="bar" 
+                  class="bar-container"
+                >
+                  <div class="bar-label">{{ bar }}</div>
+                  <div class="bar-beats">
+                    <div 
+                      v-for="beat in beatsPerBar" 
+                      :key="beat" 
+                      class="beat-block"
+                      :class="getPatternClass(section, inst, bar, beat)"
+                      @click="togglePattern(section, inst, bar, beat)"
+                      :title="`Bar ${bar}, Beat ${beat}`"
+                    >
+                      <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -193,6 +199,22 @@ const beatsPerBar = computed(() => {
   const [beats] = song.value.timeSignature.split('/').map(Number)
   return beats || 4 // Default to 4 if parsing fails
 })
+
+// Get bars per row from time signature (use numerator)
+const barsPerRow = computed(() => {
+  const [beats] = song.value.timeSignature.split('/').map(Number)
+  return beats || 4 // Default to 4 if parsing fails
+})
+
+// Group bars into rows based on time signature
+const getBarRows = (totalBars) => {
+  const bars = Array.from({ length: totalBars }, (_, i) => i + 1)
+  const rows = []
+  for (let i = 0; i < bars.length; i += barsPerRow.value) {
+    rows.push(bars.slice(i, i + barsPerRow.value))
+  }
+  return rows
+}
 
 const togglePlay = () => {
   if (isPlaying.value) {
@@ -678,6 +700,12 @@ const decrementBars = (section) => {
 
 .pattern-map {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bar-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
