@@ -10,12 +10,24 @@
         <div class="login-card">
           <h2>{{ isSignUp ? 'Create Account' : 'Welcome Back' }}</h2>
           <p class="login-description">
-            {{ isSignUp ? 'Create an account to access:' : 'Sign in with your email to access:' }}
+            {{ isSignUp ? 'Create an account to access premium features' : 'Sign in with your email to access premium features' }}
           </p>
-          <ul class="features-list">
-            <li>📜 Performance View</li>
-            <li>🎛️ Multi-Track Editor</li>
-          </ul>
+          <div class="feature-buttons">
+            <button 
+              class="feature-btn" 
+              @click="$emit('open-tab', 'slowdowner')"
+              :disabled="loading"
+            >
+              🎚️ Slow Downer
+            </button>
+            <button 
+              class="feature-btn" 
+              @click="$emit('open-tab', 'analyzer')"
+              :disabled="loading"
+            >
+              🔍 Music Analyzer
+            </button>
+          </div>
 
           <form @submit.prevent="handleSubmit" class="login-form">
             <div class="form-group">
@@ -55,7 +67,7 @@
             </button>
           </form>
 
-          <div class="toggle-mode">
+          <!-- <div class="toggle-mode">
             <p>
               {{ isSignUp ? 'Already have an account?' : "Don't have an account?" }}
               <button 
@@ -67,7 +79,7 @@
                 {{ isSignUp ? 'Sign In' : 'Sign Up' }}
               </button>
             </p>
-          </div>
+          </div> -->
 
           <p v-if="error" class="error-message">{{ error }}</p>
         </div>
@@ -156,17 +168,37 @@ const handleSubmit = async () => {
   text-align: center;
 }
 
-.features-list {
-  list-style: none;
-  padding: 0;
+.feature-buttons {
+  display: flex;
+  gap: 12px;
   margin: 0 0 32px 0;
-  text-align: center;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
-.features-list li {
-  padding: 8px 0;
-  color: #4a5568;
+.feature-btn {
+  flex: 1;
+  min-width: 150px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 10px;
   font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.feature-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.feature-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .login-form {

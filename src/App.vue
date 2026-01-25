@@ -1,14 +1,14 @@
 <template>
-  <!-- Show login if not authenticated -->
-  <LoginView v-if="!isAuthenticated && !loading" />
-
   <!-- Show loading state -->
-  <div v-else-if="loading" class="loading-container">
+  <div v-if="loading" class="loading-container">
     <div class="loading-spinner"></div>
     <p>Loading...</p>
   </div>
 
-  <!-- Main app when authenticated -->
+  <!-- Show login if not authenticated and trying to access protected tabs, or if showLoginView is true -->
+  <LoginView v-else-if="(!isAuthenticated && activeTab !== 'slowdowner' && activeTab !== 'analyzer') || showLoginView" @open-tab="activeTab = $event; showLoginView = false" />
+
+  <!-- Main app (available for slowdowner/analyzer even without auth, or all tabs when authenticated) -->
   <div v-else class="container">
     <header>
       <div class="header-content">
@@ -17,7 +17,7 @@
           <p class="subtitle">Upload and analyze or slow down your music</p>
         </div>
         <div class="user-info">
-          <div class="user-details">
+          <div v-if="isAuthenticated" class="user-details">
             <img 
               v-if="user?.photoURL" 
               :src="user.photoURL" 
@@ -26,8 +26,11 @@
             />
             <span class="user-name">{{ user?.displayName || user?.email }}</span>
           </div>
-          <button class="btn-logout" @click="handleLogout" title="Sign out">
+          <button v-if="isAuthenticated" class="btn-logout" @click="handleLogout" title="Sign out">
             Sign Out
+          </button>
+          <button v-else class="btn-login" @click="showLoginView = true" title="Sign in">
+            Sign In
           </button>
         </div>
       </div>
@@ -114,6 +117,7 @@ const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
+const showLoginView = ref(false)
 
 const isAuthenticated = computed(() => checkAuth())
 
@@ -121,6 +125,10 @@ const isAuthenticated = computed(() => checkAuth())
 watch([isAuthenticated, activeTab], ([authenticated, tab]) => {
   if (!authenticated && (tab === 'multitrack' || tab === 'performance')) {
     activeTab.value = 'slowdowner'
+  }
+  // Hide login view when user successfully authenticates
+  if (authenticated) {
+    showLoginView.value = false
   }
 })
 
@@ -197,7 +205,8 @@ header h1 {
   font-weight: 500;
 }
 
-.btn-logout {
+.btn-logout,
+.btn-login {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -209,7 +218,8 @@ header h1 {
   transition: all 0.3s ease;
 }
 
-.btn-logout:hover {
+.btn-logout:hover,
+.btn-login:hover {
   background: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.5);
 }
