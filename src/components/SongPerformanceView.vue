@@ -61,11 +61,27 @@
               <div class="meta-info">
                 <span class="bpm">
                   <span class="label">BPM</span>
-                  <span class="value">{{ song.bpm }}</span>
+                  <input 
+                    v-model.number="song.bpm" 
+                    type="number" 
+                    min="1" 
+                    max="300" 
+                    class="meta-value-input"
+                    @blur="autoSave(selectedSongId, song)"
+                    @keyup.enter="$event.target.blur()"
+                  />
                 </span>
                 <span class="time-sig">
                   <span class="label">SIG</span>
-                  <span class="value">{{ song.timeSignature }}</span>
+                  <input 
+                    v-model="song.timeSignature" 
+                    type="text" 
+                    pattern="\d+/\d+"
+                    placeholder="4/4"
+                    class="meta-value-input"
+                    @blur="autoSave(selectedSongId, song)"
+                    @keyup.enter="$event.target.blur()"
+                  />
                 </span>
               </div>
             </div>
@@ -1172,6 +1188,7 @@ watch(() => song.value, (newSong, oldSong) => {
 .meta-info {
   display: flex;
   gap: 16px;
+  align-items: center;
 }
 
 .bpm,
@@ -1184,6 +1201,40 @@ watch(() => song.value, (newSong, oldSong) => {
   border-radius: 6px;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.meta-value-input {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  width: 50px;
+  text-align: center;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.meta-value-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+}
+
+.meta-value-input:hover {
+  border-color: #e2e8f0;
+}
+
+.meta-value-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.meta-value-input[type="number"]::-webkit-outer-spin-button,
+.meta-value-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .label {
