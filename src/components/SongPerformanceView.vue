@@ -223,16 +223,39 @@
 
         <!-- Song Strip (Sticky) -->
         <div class="preview-song-strip" v-if="song">
-          <div v-for="(section, index) in song.sections" :key="index" class="preview-strip-segment"
-            :style="{ flex: section.bars }">
-            <span class="preview-strip-name">{{ section.name }}</span>
-            <span class="preview-strip-bars">{{ section.bars }} bars</span>
+          <div 
+            v-for="(section, sectionIndex) in song.sections" 
+            :key="sectionIndex" 
+            class="preview-strip-segment"
+            :class="{ 'preview-strip-segment-active': currentPreviewSectionIndex === sectionIndex }"
+            :style="{ flex: section.bars }"
+            @click="scrollToPreviewSection(sectionIndex)"
+          >
+            <div class="preview-strip-section-header">
+              <span class="preview-strip-name">{{ section.name }}</span>
+              <span class="preview-strip-bars">{{ section.bars }} bars</span>
+            </div>
+            <div class="preview-strip-bars-container">
+              <template v-for="bar in Array.from({ length: section.bars }, (_, i) => i + 1)" :key="bar">
+                <div 
+                  v-if="bar > 1 && (bar - 1) % barsPerPhrase === 0"
+                  class="preview-strip-phase-marker"
+                  :title="`Phase marker at bar ${bar}`"
+                ></div>
+                <div 
+                  class="preview-strip-bar-segment"
+                  :class="getBarPatternClass(section, bar)"
+                  :style="{ flex: 1 }"
+                  :title="`Bar ${bar}: ${getBarPatternLabel(section, bar)}`"
+                ></div>
+              </template>
+            </div>
           </div>
         </div>
 
         <!-- Preview Sections Container -->
         <div class="preview-sections-container">
-          <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card">
+          <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card" :class="{ 'preview-section-card-active': currentPreviewSectionIndex === index }" :id="'preview-section-' + index">
             <div class="preview-instruments-grid">
               <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
                 <div class="preview-instrument-header">
@@ -585,6 +608,7 @@ const removeInstrument = (instrumentName) => {
 }
 
 const currentSectionIndex = ref(0)
+const currentPreviewSectionIndex = ref(-1)
 const currentBar = ref(1) // 1-based index within section
 const currentBeat = ref(1) // 1-based index within bar
 const isPlaying = ref(false)
@@ -605,6 +629,13 @@ const beatsPerBar = computed(() => {
 
 // Get bars per row from time signature (use numerator)
 const barsPerRow = computed(() => {
+  if (!song.value) return 4
+  const [beats] = song.value.timeSignature.split('/').map(Number)
+  return beats || 4 // Default to 4 if parsing fails
+})
+
+// Get bars per phrase from time signature (use numerator - typically 4 bars per phrase in 4/4)
+const barsPerPhrase = computed(() => {
   if (!song.value) return 4
   const [beats] = song.value.timeSignature.split('/').map(Number)
   return beats || 4 // Default to 4 if parsing fails
@@ -697,6 +728,48 @@ const getPatternIcon = (section, instrument, bar, beat) => {
   }
 }
 
+// Get the overall pattern for a bar across all visible instruments
+const getBarPattern = (section, bar) => {
+  if (!section.patterns || visibleInstruments.value.length === 0) return 'play'
+  
+  const beats = beatsPerBar.value
+  const patterns = []
+  
+  // Check all beats for all visible instruments
+  for (const inst of visibleInstruments.value) {
+    for (let beat = 1; beat <= beats; beat++) {
+      const patternKey = `${bar}-${beat}`
+      const pattern = section.patterns[inst]?.[patternKey] || 'play'
+      patterns.push(pattern)
+    }
+  }
+  
+  // Determine overall pattern:
+  // - If all are 'rest' -> 'rest'
+  // - If any are 'fill' -> 'fill'
+  // - Otherwise -> 'play'
+  if (patterns.every(p => p === 'rest')) return 'rest'
+  if (patterns.some(p => p === 'fill')) return 'fill'
+  return 'play'
+}
+
+// Get CSS class for bar pattern
+const getBarPatternClass = (section, bar) => {
+  const pattern = getBarPattern(section, bar)
+  return `bar-pattern-${pattern}`
+}
+
+// Get label for bar pattern
+const getBarPatternLabel = (section, bar) => {
+  const pattern = getBarPattern(section, bar)
+  switch (pattern) {
+    case 'rest': return 'Rest'
+    case 'fill': return 'Fill'
+    case 'play': return 'Play'
+    default: return 'Play'
+  }
+}
+
 const togglePattern = (section, instrument, bar, beat) => {
   if (!section.patterns[instrument]) {
     section.patterns[instrument] = {}
@@ -721,8 +794,41 @@ const scrollToSection = (index) => {
   }
 }
 
+// Scroll to section in preview mode
+const scrollToPreviewSection = async (index) => {
+  await nextTick()
+  // Try multiple times in case DOM isn't ready
+  let attempts = 0
+  const tryScroll = () => {
+    const el = document.getElementById(`preview-section-${index}`)
+    if (el) {
+      // Find the scroll container (preview-sections-container)
+      const container = el.closest('.preview-sections-container')
+      if (container) {
+        // Calculate position relative to container
+        const containerRect = container.getBoundingClientRect()
+        const elementRect = el.getBoundingClientRect()
+        const scrollTop = container.scrollTop + (elementRect.top - containerRect.top) - 20 // 20px offset
+        container.scrollTo({ top: scrollTop, behavior: 'smooth' })
+      } else {
+        // Fallback to window scroll
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      // Update active index immediately when clicking
+      currentPreviewSectionIndex.value = index
+    } else if (attempts < 5) {
+      attempts++
+      setTimeout(tryScroll, 100)
+    } else {
+      console.warn(`Could not find preview-section-${index}`)
+    }
+  }
+  tryScroll()
+}
+
 // Scroll detection for active section
 let observer = null
+let previewObserver = null
 
 onMounted(() => {
   // Set up observer if a song is already selected
@@ -752,6 +858,9 @@ watch(() => song.value?.sections?.length, async () => {
   if (!song.value) return
   await nextTick()
   setupObserver()
+  if (showPreview.value) {
+    setupPreviewObserver()
+  }
 })
 
 // Watch for song selection to set up observer
@@ -763,6 +872,23 @@ watch(() => selectedSongId.value, async () => {
     if (observer) {
       observer.disconnect()
       observer = null
+    }
+    if (previewObserver) {
+      previewObserver.disconnect()
+      previewObserver = null
+    }
+  }
+})
+
+// Watch for preview mode to set up preview observer
+watch(() => showPreview.value, async () => {
+  if (showPreview.value) {
+    await nextTick()
+    setupPreviewObserver()
+  } else {
+    if (previewObserver) {
+      previewObserver.disconnect()
+      previewObserver = null
     }
   }
 })
@@ -795,6 +921,54 @@ const setupObserver = () => {
   document.querySelectorAll('.section-card').forEach((section) => {
     observer.observe(section)
   })
+}
+
+// Helper function to set up the intersection observer for preview mode
+const setupPreviewObserver = () => {
+  if (!song.value || !showPreview.value) return
+
+  if (previewObserver) {
+    previewObserver.disconnect()
+  }
+
+  // Find the scroll container
+  const container = document.querySelector('.preview-sections-container')
+  
+  const options = {
+    root: container, // Use the scroll container as root
+    threshold: [0, 0.1, 0.3, 0.5, 0.7, 1.0], // Multiple thresholds for better detection
+    rootMargin: '-10% 0px -70% 0px' // Trigger when section is in upper portion of container
+  }
+
+  previewObserver = new IntersectionObserver((entries) => {
+    // Find the entry with the highest intersection ratio (most visible)
+    let mostVisible = null
+    let highestRatio = 0
+    
+    entries.forEach((entry) => {
+      if (entry.isIntersecting && entry.intersectionRatio > highestRatio) {
+        highestRatio = entry.intersectionRatio
+        mostVisible = entry
+      }
+    })
+    
+    if (mostVisible) {
+      const index = parseInt(mostVisible.target.id.replace('preview-section-', ''))
+      if (!isNaN(index)) {
+        currentPreviewSectionIndex.value = index
+      }
+    }
+  }, options)
+
+  // Use setTimeout to ensure DOM is ready
+  setTimeout(() => {
+    const sections = document.querySelectorAll('.preview-section-card')
+    sections.forEach((section) => {
+      if (section.id && section.id.startsWith('preview-section-')) {
+        previewObserver.observe(section)
+      }
+    })
+  }, 200)
 }
 
 const addSection = () => {
@@ -1794,28 +1968,95 @@ watch(() => song.value, (newSong, oldSong) => {
   position: sticky;
   top: 0;
   display: flex;
-  height: 40px;
+  min-height: 60px;
   width: 100%;
   background: #e0e0e0;
   overflow-x: auto;
   z-index: 5;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 6px 0;
 }
 
 .preview-strip-segment {
   border-right: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
+  align-items: stretch;
+  justify-content: flex-start;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #666;
   background: #d1d5db;
   white-space: nowrap;
   overflow: hidden;
-  padding: 2px 6px;
-  min-width: 60px;
+  min-width: 80px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-left-color 0.2s;
+}
+
+.preview-strip-segment:hover {
+  background: #9ca3af;
+}
+
+.preview-section-card-active {
+  border-left: 4px solid #667eea;
+}
+
+.preview-strip-section-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 2px;
+}
+
+.preview-strip-bars-container {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  justify-content: stretch;
+  flex: 1;
+  min-height: 24px;
+  padding: 0;
+  width: 100%;
+  position: relative;
+}
+
+.preview-strip-bar-segment {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  transition: all 0.2s;
+  background: #48bb78; /* Default to play (green) */
+  display: block;
+  cursor: pointer;
+}
+
+.preview-strip-phase-marker {
+  width: 1px;
+  background: #353535;
+  flex-shrink: 0;
+  height: 100%;
+  z-index: 10;
+  position: relative;
+  /* box-shadow: 0 0 3px rgba(0, 0, 0, 0.5); */
+  opacity: 0.8;
+}
+
+.bar-pattern-play {
+  background: #48bb78;
+  border-color: #38a169;
+}
+
+.bar-pattern-rest {
+  background: #cbd5e0;
+  border-color: #a0aec0;
+}
+
+.bar-pattern-fill {
+  background: #ed8936;
+  border-color: #dd6b20;
 }
 
 .preview-strip-name {
@@ -1843,6 +2084,11 @@ watch(() => song.value, (newSong, oldSong) => {
   padding: 12px;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid transparent;
+  transition: border-left-color 0.2s;
+}
+
+.preview-section-card-active {
   border-left: 4px solid #667eea;
 }
 
