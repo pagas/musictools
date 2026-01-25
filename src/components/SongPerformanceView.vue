@@ -419,10 +419,29 @@ watch(() => selectedSongId.value, (newId, oldId) => {
   if (newId !== oldId) {
     // Reset initialization flag when song changes
     songInitialized.value = false
+    // Reset selected instrument when switching songs
+    selectedInstrument.value = null
     // Set flag after a short delay to allow song to load
     setTimeout(() => {
       if (song.value) {
         songInitialized.value = true
+        // Restore selected instrument from song metadata
+        isRestoringInstrument = true
+        if (song.value.metadata && song.value.metadata.selectedInstrument) {
+          const savedInstrument = song.value.metadata.selectedInstrument
+          // Only restore if the instrument still exists in the song's instruments list
+          if (!savedInstrument || song.value.instruments?.includes(savedInstrument)) {
+            selectedInstrument.value = savedInstrument
+          } else {
+            selectedInstrument.value = null
+          }
+        } else {
+          selectedInstrument.value = null
+        }
+        // Reset flag after restoration
+        setTimeout(() => {
+          isRestoringInstrument = false
+        }, 50)
       }
     }, 100)
   }
@@ -460,6 +479,25 @@ watch(() => song.value?.instruments, () => {
 }, { deep: true, flush: 'post' })
 
 const selectedInstrument = ref(null)
+
+// Flag to prevent saving when restoring from song data
+let isRestoringInstrument = false
+
+// Watch for selectedInstrument changes and save to song
+watch(selectedInstrument, (newInstrument) => {
+  // Don't save if we're restoring from song data
+  if (isRestoringInstrument) return
+  
+  if (song.value && selectedSongId.value && songInitialized.value) {
+    // Save selected instrument to song data
+    if (!song.value.metadata) {
+      song.value.metadata = {}
+    }
+    song.value.metadata.selectedInstrument = newInstrument
+    // Auto-save the change
+    autoSave(selectedSongId.value, song.value)
+  }
+})
 
 // Instrument management
 const newInstrumentName = ref('')
