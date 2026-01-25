@@ -97,18 +97,6 @@
           <button class="btn-preview" @click="showPreview = true" title="Preview">
             👁️ Preview
           </button>
-          <div class="current-section-display" v-if="currentSection">
-            <button class="btn-play" @click="togglePlay">
-              {{ isPlaying ? '⏸' : '▶' }}
-            </button>
-            <div class="section-info-display">
-              <span class="label">CURRENT</span>
-              <span class="value">{{ currentSection.name }}</span>
-              <div class="bar-progress">
-                Bar {{ currentBar }} / {{ currentSection.bars }} • Beat {{ currentBeat }} / {{ beatsPerBar }}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1245,26 +1233,6 @@ watch(() => song.value, (newSong, oldSong) => {
   letter-spacing: 0.5px;
 }
 
-.current-section-display {
-  text-align: right;
-  background: #eef2ff;
-  padding: 8px 16px;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-}
-
-.current-section-display .value {
-  display: block;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #667eea;
-}
-
-.bar-progress {
-  font-size: 0.85rem;
-  color: #666;
-  margin-top: 4px;
-}
 
 .instrument-filter {
   display: flex;
@@ -1947,14 +1915,6 @@ watch(() => song.value, (newSong, oldSong) => {
     align-items: stretch;
   }
   
-  .current-section-display {
-    width: 100%;
-    text-align: left;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
   .preview-header {
     padding: 10px 12px;
   }
