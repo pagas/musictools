@@ -8,21 +8,12 @@
           + Create New Song
         </button>
       </div>
-      
+
       <div class="songs-grid">
-        <div 
-          v-for="songItem in songs" 
-          :key="songItem.id"
-          class="song-card"
-          @click="openSong(songItem.id)"
-        >
+        <div v-for="songItem in songs" :key="songItem.id" class="song-card" @click="openSong(songItem.id)">
           <div class="song-card-header">
             <h3>{{ songItem.title }}</h3>
-            <button 
-              class="btn-delete-song" 
-              @click.stop="deleteSong(songItem.id)"
-              title="Delete Song"
-            >
+            <button class="btn-delete-song" @click.stop="deleteSong(songItem.id)" title="Delete Song">
               🗑️
             </button>
           </div>
@@ -32,11 +23,7 @@
             <span>{{ songItem.sections.length }} sections</span>
           </div>
           <div class="song-card-sections">
-            <span 
-              v-for="(section, index) in songItem.sections.slice(0, 3)" 
-              :key="index"
-              class="section-tag"
-            >
+            <span v-for="(section, index) in songItem.sections.slice(0, 3)" :key="index" class="section-tag">
               {{ section.name }}
             </span>
             <span v-if="songItem.sections.length > 3" class="section-tag more">
@@ -45,7 +32,7 @@
           </div>
         </div>
       </div>
-      
+
       <div v-if="songsLoading" class="empty-state">
         <p>Loading songs...</p>
       </div>
@@ -56,40 +43,78 @@
 
     <!-- Song Editor View -->
     <div v-else-if="!showSongList" class="song-editor-view">
-      <!-- Sticky Header -->
-      <header class="sticky-header">
+      <!-- Header (not sticky) -->
       <div class="header-top">
         <div class="song-info">
           <button class="btn-back" @click="selectedSongId = null" title="Back to Songs">
             ← Back
           </button>
-          <div v-if="song">
-            <input 
-              v-model="song.title" 
-              class="song-title-input" 
-              placeholder="Song Title"
-              @blur="autoSave(selectedSongId, song)"
-            />
-            <div class="meta-info">
-              <span class="bpm">
-                <span class="label">BPM</span>
-                <span class="value">{{ song.bpm }}</span>
-              </span>
-              <span class="time-sig">
-                <span class="label">SIG</span>
-                <span class="value">{{ song.timeSignature }}</span>
-              </span>
+          <div v-if="song" class="header-content-row">
+
+
+
+
+            <div class="song-info-content">
+
+              <input v-model="song.title" class="song-title-input" placeholder="Song Title"
+                @blur="autoSave(selectedSongId, song)" />
+              <div class="meta-info">
+                <span class="bpm">
+                  <span class="label">BPM</span>
+                  <span class="value">{{ song.bpm }}</span>
+                </span>
+                <span class="time-sig">
+                  <span class="label">SIG</span>
+                  <span class="value">{{ song.timeSignature }}</span>
+                </span>
+              </div>
             </div>
+
+            <!-- Instrument Filter -->
+            <div class="instrument-filter" v-if="song">
+              <div class="instrument-list">
+                <button class="filter-btn" :class="{ active: selectedInstrument === null }"
+                  @click="selectedInstrument = null">
+                  All
+                </button>
+                <span v-for="inst in song.instruments || []" :key="inst" class="instrument-tag"
+                  :class="{ active: selectedInstrument === inst }" @click="selectedInstrument = inst">
+                  {{ inst }}
+                  <button class="instrument-remove" @click.stop="removeInstrument(inst)" title="Remove instrument">
+                    ×
+                  </button>
+                </span>
+              </div>
+              <div class="instrument-manager">
+                <div class="instrument-dropdown-wrapper">
+                  <select v-model="newInstrumentName" class="instrument-select" @change="addInstrument">
+                    <option value="">Add Instrument...</option>
+                    <option value="Drums">Drums</option>
+                    <option value="Bass">Bass</option>
+                    <option value="Guitar">Guitar</option>
+                    <option value="Keys">Keys</option>
+                    <option value="Piano">Piano</option>
+                    <option value="Vocals">Vocals</option>
+                    <option value="Strings">Strings</option>
+                    <option value="Brass">Brass</option>
+                    <option value="Percussion">Percussion</option>
+                    <option value="Synth">Synth</option>
+                  </select>
+                  <input v-model="customInstrumentName" type="text" placeholder="Or type custom name"
+                    class="instrument-input" @keyup.enter="addCustomInstrument" @blur="addCustomInstrument" />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
-        
+      </div>
+
+      <!-- Sticky Header with Actions and Song Strip -->
+      <div class="sticky-header-container" v-if="song">
         <div class="header-actions">
-          <button 
-            class="btn-save" 
-            @click="manualSave" 
-            :disabled="saving || !song"
-            :title="saving ? 'Saving...' : 'Save Song'"
-          >
+          <button class="btn-save" @click="manualSave" :disabled="saving || !song"
+            :title="saving ? 'Saving...' : 'Save Song'">
             <span v-if="saving">💾 Saving...</span>
             <span v-else-if="lastSaved">✓ Saved</span>
             <span v-else>💾 Save</span>
@@ -98,134 +123,55 @@
             👁️ Preview
           </button>
         </div>
-      </div>
 
-      <!-- Instrument Filter -->
-      <div class="instrument-filter" v-if="song">
-        <div class="instrument-list">
-          <button 
-            class="filter-btn" 
-            :class="{ active: selectedInstrument === null }"
-            @click="selectedInstrument = null"
-          >
-            All
-          </button>
-          <span 
-            v-for="inst in song.instruments || []" 
-            :key="inst"
-            class="instrument-tag"
-            :class="{ active: selectedInstrument === inst }"
-            @click="selectedInstrument = inst"
-          >
-            {{ inst }}
-            <button 
-              class="instrument-remove"
-              @click.stop="removeInstrument(inst)"
-              title="Remove instrument"
-            >
-              ×
-            </button>
-          </span>
-        </div>
-        <div class="instrument-manager">
-          <div class="instrument-dropdown-wrapper">
-            <select 
-              v-model="newInstrumentName" 
-              class="instrument-select"
-              @change="addInstrument"
-            >
-              <option value="">Add Instrument...</option>
-              <option value="Drums">Drums</option>
-              <option value="Bass">Bass</option>
-              <option value="Guitar">Guitar</option>
-              <option value="Keys">Keys</option>
-              <option value="Piano">Piano</option>
-              <option value="Vocals">Vocals</option>
-              <option value="Strings">Strings</option>
-              <option value="Brass">Brass</option>
-              <option value="Percussion">Percussion</option>
-              <option value="Synth">Synth</option>
-            </select>
-            <input 
-              v-model="customInstrumentName"
-              type="text"
-              placeholder="Or type custom name"
-              class="instrument-input"
-              @keyup.enter="addCustomInstrument"
-              @blur="addCustomInstrument"
-            />
+        <!-- Song Strip Overview (Sticky) -->
+        <div class="song-strip">
+          <div v-for="(section, index) in song.sections" :key="index" class="strip-segment"
+            :class="{ active: currentSectionIndex === index }" :style="{ flex: section.bars }">
+            <span class="strip-name">{{ section.name }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Song Strip Overview -->
-      <div class="song-strip" v-if="song">
-        <div 
-          v-for="(section, index) in song.sections" 
-          :key="index"
-          class="strip-segment"
-          :class="{ active: currentSectionIndex === index }"
-          :style="{ flex: section.bars }"
-        >
-          <span class="strip-name">{{ section.name }}</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Scrollable Body -->
-    <div class="sections-container" ref="sectionsContainer" v-if="song">
-      <div 
-        v-for="(section, index) in song.sections" 
-        :key="index" 
-        class="section-card"
-        :id="'section-' + index"
-        :class="{ active: currentSectionIndex === index }"
-      >
-        <div class="section-header">
-          <div class="section-title">
-            <input v-model="section.name" class="name-input" placeholder="Section Name" />
-            <div class="bar-control">
-              <button class="bar-btn" @click="decrementBars(section)" :disabled="section.bars <= 1" title="Remove Bar">−</button>
-              <input v-model.number="section.bars" type="number" min="1" class="bar-input" />
-              <button class="bar-btn" @click="incrementBars(section)" title="Add Bar">+</button>
-              <span>Bars</span>
+      <!-- Main Scrollable Body -->
+      <div class="sections-container" ref="sectionsContainer" v-if="song">
+        <div v-for="(section, index) in song.sections" :key="index" class="section-card" :id="'section-' + index"
+          :class="{ active: currentSectionIndex === index }">
+          <div class="section-header">
+            <div class="section-title">
+              <input v-model="section.name" class="name-input" placeholder="Section Name" />
+              <div class="bar-control">
+                <button class="bar-btn" @click="decrementBars(section)" :disabled="section.bars <= 1"
+                  title="Remove Bar">−</button>
+                <input v-model.number="section.bars" type="number" min="1" class="bar-input" />
+                <button class="bar-btn" @click="incrementBars(section)" title="Add Bar">+</button>
+                <span>Bars</span>
+              </div>
+            </div>
+            <div class="section-actions">
+              <div class="section-instructions" v-if="section.instructions">
+                {{ section.instructions }}
+              </div>
+              <button class="btn-remove" @mousedown.stop="removeSection(index)" @touchstart.stop="removeSection(index)"
+                title="Remove Section">
+                🗑️
+              </button>
             </div>
           </div>
-          <div class="section-actions">
-            <div class="section-instructions" v-if="section.instructions">
-              {{ section.instructions }}
-            </div>
-            <button class="btn-remove" @mousedown.stop="removeSection(index)" @touchstart.stop="removeSection(index)" title="Remove Section">
-              🗑️
-            </button>
-          </div>
-        </div>
 
-        <div class="instruments-grid">
-          <div v-for="inst in visibleInstruments" :key="inst" class="instrument-row">
-            <div class="instrument-name">{{ inst }}</div>
-            <div class="pattern-map">
-              <div 
-                v-for="(row, rowIndex) in getBarRows(section.bars)" 
-                :key="rowIndex"
-                class="bar-row"
-              >
-                <div 
-                  v-for="bar in row" 
-                  :key="bar" 
-                  class="bar-container"
-                >
-                  <div class="bar-label">{{ bar }}</div>
-                  <div class="bar-beats">
-                    <div 
-                      v-for="beat in beatsPerBar" 
-                      :key="beat" 
-                      class="beat-block"
-                      :class="getPatternClass(section, inst, bar, beat)"
-                      @click="togglePattern(section, inst, bar, beat)"
-                      :title="`Bar ${bar}, Beat ${beat}`"
-                    >
-                      <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+          <div class="instruments-grid">
+            <div v-for="inst in visibleInstruments" :key="inst" class="instrument-row">
+              <div class="instrument-name">{{ inst }}</div>
+              <div class="pattern-map">
+                <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="bar-row">
+                  <div v-for="bar in row" :key="bar" class="bar-container">
+                    <div class="bar-label">{{ bar }}</div>
+                    <div class="bar-beats">
+                      <div v-for="beat in beatsPerBar" :key="beat" class="beat-block"
+                        :class="getPatternClass(section, inst, bar, beat)"
+                        @click="togglePattern(section, inst, bar, beat)" :title="`Bar ${bar}, Beat ${beat}`">
+                        <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -233,15 +179,14 @@
             </div>
           </div>
         </div>
+
+        <!-- Edit Controls (Simple version) -->
+        <div class="edit-controls">
+          <button @click="addSection" class="btn-add">
+            + Add Section
+          </button>
+        </div>
       </div>
-      
-      <!-- Edit Controls (Simple version) -->
-      <div class="edit-controls">
-        <button @click="addSection" class="btn-add">
-          + Add Section
-        </button>
-      </div>
-    </div>
     </div>
 
     <!-- Preview Modal -->
@@ -259,15 +204,11 @@
             ✕
           </button>
         </div>
-        
+
         <!-- Song Strip (Sticky) -->
         <div class="preview-song-strip" v-if="song">
-          <div 
-            v-for="(section, index) in song.sections" 
-            :key="index"
-            class="preview-strip-segment"
-            :style="{ flex: section.bars }"
-          >
+          <div v-for="(section, index) in song.sections" :key="index" class="preview-strip-segment"
+            :style="{ flex: section.bars }">
             <span class="preview-strip-name">{{ section.name }}</span>
             <span class="preview-strip-bars">{{ section.bars }} bars</span>
           </div>
@@ -275,11 +216,7 @@
 
         <!-- Preview Sections Container -->
         <div class="preview-sections-container">
-          <div 
-            v-for="(section, index) in song.sections" 
-            :key="index" 
-            class="preview-section-card"
-          >
+          <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card">
             <div class="preview-instruments-grid">
               <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
                 <div class="preview-instrument-header">
@@ -291,24 +228,12 @@
                   <div class="preview-instrument-name" v-if="visibleInstruments.length > 1">{{ inst }}</div>
                 </div>
                 <div class="preview-pattern-map">
-                  <div 
-                    v-for="(row, rowIndex) in getBarRows(section.bars)" 
-                    :key="rowIndex"
-                    class="preview-bar-row"
-                  >
-                    <div 
-                      v-for="bar in row" 
-                      :key="bar" 
-                      class="preview-bar-container"
-                    >
+                  <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
+                    <div v-for="bar in row" :key="bar" class="preview-bar-container">
                       <div class="preview-bar-beats">
-                        <div 
-                          v-for="beat in beatsPerBar" 
-                          :key="beat" 
-                          class="preview-beat-block"
+                        <div v-for="beat in beatsPerBar" :key="beat" class="preview-beat-block"
                           :class="getPatternClass(section, inst, bar, beat)"
-                          :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`"
-                        >
+                          :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`">
                           <span class="preview-pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
                         </div>
                       </div>
@@ -421,34 +346,34 @@ const getSongDataForComparison = (songData) => {
 // Auto-save function
 const autoSave = (songId, songData) => {
   if (!songId || !isAuthenticated() || isUpdatingFromFirestore) return
-  
+
   // Check if data actually changed
   const currentData = getSongDataForComparison(songData)
   if (currentData === lastSavedData) {
     return // No changes, skip save
   }
-  
+
   // Clear existing timer
   if (saveTimer) {
     clearTimeout(saveTimer)
   }
-  
+
   // Set new timer
   saveTimer = setTimeout(async () => {
     if (saving.value || isUpdatingFromFirestore) return // Don't auto-save if manual save is in progress or Firestore update
-    
+
     // Double-check data hasn't changed while waiting
     const currentDataCheck = getSongDataForComparison(songData)
     if (currentDataCheck === lastSavedData) {
       return // Data already saved, skip
     }
-    
+
     try {
       saving.value = true
       // Remove metadata fields before saving
       const { id, userId, createdAt, updatedAt, ...dataToSave } = songData
       const result = await updateSong(songId, dataToSave)
-      
+
       if (result.success) {
         // Update last saved data
         lastSavedData = getSongDataForComparison(songData)
@@ -556,11 +481,11 @@ const visibleInstruments = computed(() => {
 // Add instrument from dropdown
 const addInstrument = () => {
   if (!song.value || !newInstrumentName.value) return
-  
+
   if (!song.value.instruments) {
     song.value.instruments = []
   }
-  
+
   if (!song.value.instruments.includes(newInstrumentName.value)) {
     song.value.instruments.push(newInstrumentName.value)
     newInstrumentName.value = '' // Reset dropdown
@@ -570,13 +495,13 @@ const addInstrument = () => {
 // Add custom instrument
 const addCustomInstrument = () => {
   if (!song.value || !customInstrumentName.value.trim()) return
-  
+
   const instrumentName = customInstrumentName.value.trim()
-  
+
   if (!song.value.instruments) {
     song.value.instruments = []
   }
-  
+
   if (!song.value.instruments.includes(instrumentName)) {
     song.value.instruments.push(instrumentName)
     customInstrumentName.value = '' // Clear input
@@ -586,16 +511,16 @@ const addCustomInstrument = () => {
 // Remove instrument
 const removeInstrument = (instrumentName) => {
   if (!song.value || !song.value.instruments) return
-  
+
   const index = song.value.instruments.indexOf(instrumentName)
   if (index > -1) {
     song.value.instruments.splice(index, 1)
-    
+
     // Clear selection if removed instrument was selected
     if (selectedInstrument.value === instrumentName) {
       selectedInstrument.value = null
     }
-    
+
     // Clean up patterns for removed instrument in all sections
     song.value.sections.forEach(section => {
       if (section.patterns && section.patterns[instrumentName]) {
@@ -653,7 +578,7 @@ const play = () => {
   if (!song.value) return
   isPlaying.value = true
   const msPerBeat = 60000 / song.value.bpm
-  
+
   playbackInterval = setInterval(() => {
     if (!song.value || !currentSection.value) {
       pause()
@@ -722,7 +647,7 @@ const togglePattern = (section, instrument, bar, beat) => {
   if (!section.patterns[instrument]) {
     section.patterns[instrument] = {}
   }
-  
+
   const patternKey = `${bar}-${beat}`
   const current = section.patterns[instrument][patternKey] || 'play'
   const next = {
@@ -730,7 +655,7 @@ const togglePattern = (section, instrument, bar, beat) => {
     'rest': 'fill',
     'fill': 'play'
   }[current]
-  
+
   section.patterns[instrument][patternKey] = next
 }
 
@@ -791,17 +716,15 @@ watch(() => selectedSongId.value, async () => {
 // Helper function to set up the intersection observer
 const setupObserver = () => {
   if (!song.value) return
-  
-  const container = document.querySelector('.sections-container')
-  if (!container) return
-  
+
   if (observer) {
     observer.disconnect()
   }
-  
+
   const options = {
-    root: container,
-    threshold: 0.5
+    root: null, // Use viewport instead of container
+    threshold: 0.3,
+    rootMargin: '-20% 0px -70% 0px' // Trigger when section is in upper portion of viewport
   }
 
   observer = new IntersectionObserver((entries) => {
@@ -855,10 +778,10 @@ const createNewSong = async () => {
     alert('Please sign in to create songs')
     return
   }
-  
+
   const newSongData = createDefaultSong()
   const result = await createSong(newSongData)
-  
+
   if (result.success) {
     selectedSongId.value = result.id
     resetPlayback()
@@ -885,9 +808,9 @@ const deleteSong = async (songId) => {
   if (!window.confirm('Are you sure you want to delete this song?')) {
     return
   }
-  
+
   const result = await deleteSongFromFirestore(songId)
-  
+
   if (result.success) {
     if (selectedSongId.value === songId) {
       selectedSongId.value = null
@@ -919,15 +842,15 @@ watch(() => song.value, (newSong, oldSong) => {
   if (newSong && newSong !== oldSong && selectedSongId.value) {
     // Mark that we're updating from Firestore to prevent save loops
     isUpdatingFromFirestore = true
-    
+
     // Ensure instruments array exists, initialize with defaults if missing
     if (!newSong.instruments || newSong.instruments.length === 0) {
       newSong.instruments = ['Drums', 'Bass', 'Guitar', 'Keys']
     }
-    
+
     // Update last saved data to match current song
     lastSavedData = getSongDataForComparison(newSong)
-    
+
     // Song loaded, mark as initialized after a brief delay
     setTimeout(() => {
       if (song.value && selectedSongId.value) {
@@ -950,16 +873,14 @@ watch(() => song.value, (newSong, oldSong) => {
 .performance-view {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 200px); /* Adjust based on parent layout */
   background: #f0f2f5;
   position: relative;
-  overflow: hidden;
 }
 
 /* Sticky Header */
 .sticky-header {
   background: #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
   padding: 0;
 }
@@ -967,15 +888,18 @@ watch(() => song.value, (newSong, oldSong) => {
 .header-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 16px 24px;
+  gap: 16px;
 }
 
-.header-actions {
+.header-content-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 24px;
+  flex: 1;
 }
+
 
 .btn-save {
   padding: 8px 16px;
@@ -1089,7 +1013,7 @@ watch(() => song.value, (newSong, oldSong) => {
   background: #fff;
   border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   cursor: pointer;
   transition: all 0.2s;
   border: 2px solid transparent;
@@ -1098,7 +1022,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .song-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border-color: #667eea;
 }
 
@@ -1173,11 +1097,8 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .song-editor-view {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
 }
 
 .song-info h2 {
@@ -1215,7 +1136,8 @@ watch(() => song.value, (newSong, oldSong) => {
   gap: 16px;
 }
 
-.bpm, .time-sig {
+.bpm,
+.time-sig {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1234,13 +1156,37 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 
+.song-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-content-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex: 1;
+  width: 100%;
+}
+
+.song-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .instrument-filter {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 24px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .instrument-list {
@@ -1370,6 +1316,26 @@ watch(() => song.value, (newSong, oldSong) => {
   border-color: #667eea;
 }
 
+/* Sticky Header Container */
+.sticky-header-container {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
 /* Song Strip */
 .song-strip {
   display: flex;
@@ -1377,10 +1343,11 @@ watch(() => song.value, (newSong, oldSong) => {
   width: 100%;
   background: #e0e0e0;
   overflow: hidden;
+  margin-top: 0;
 }
 
 .strip-segment {
-  border-right: 1px solid rgba(255,255,255,0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1418,7 +1385,7 @@ watch(() => song.value, (newSong, oldSong) => {
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border-left: 6px solid transparent;
   transition: all 0.3s ease;
 }
@@ -1457,7 +1424,8 @@ watch(() => song.value, (newSong, oldSong) => {
   font-family: inherit;
 }
 
-.name-input:hover, .name-input:focus {
+.name-input:hover,
+.name-input:focus {
   background: #f7fafc;
   border-color: #cbd5e0;
 }
@@ -1477,7 +1445,7 @@ watch(() => song.value, (newSong, oldSong) => {
   width: 24px;
   height: 24px;
   border: none;
-  background: rgba(255,255,255,0.5);
+  background: rgba(255, 255, 255, 0.5);
   color: #718096;
   font-size: 1rem;
   font-weight: bold;
@@ -1492,7 +1460,7 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .bar-btn:hover:not(:disabled) {
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   color: #4a5568;
 }
 
@@ -1521,7 +1489,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .bar-input:focus {
   outline: none;
-  background: rgba(255,255,255,0.5);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .section-actions {
@@ -1629,7 +1597,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .beat-block:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .pattern-play {
@@ -1696,7 +1664,7 @@ watch(() => song.value, (newSong, oldSong) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   z-index: 10;
 }
 
@@ -1742,11 +1710,11 @@ watch(() => song.value, (newSong, oldSong) => {
   background: #e0e0e0;
   overflow-x: auto;
   z-index: 5;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .preview-strip-segment {
-  border-right: 1px solid rgba(255,255,255,0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1785,7 +1753,7 @@ watch(() => song.value, (newSong, oldSong) => {
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border-left: 4px solid #667eea;
 }
 
@@ -1914,7 +1882,7 @@ watch(() => song.value, (newSong, oldSong) => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .preview-header {
     padding: 10px 12px;
   }
