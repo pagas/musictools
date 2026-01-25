@@ -6,7 +6,7 @@
   </div>
 
   <!-- Show login if not authenticated and trying to access protected tabs, or if showLoginView is true -->
-  <LoginView v-else-if="(!isAuthenticated && activeTab !== 'slowdowner' && activeTab !== 'analyzer') || showLoginView" @open-tab="activeTab = $event; showLoginView = false" />
+  <LoginView v-else-if="(!isAuthenticated && activeTab !== 'slowdowner' && activeTab !== 'analyzer') || showLoginView" @open-tab="setActiveTab($event); showLoginView = false" />
 
   <!-- Main app (available for slowdowner/analyzer even without auth, or all tabs when authenticated) -->
   <div v-else class="container">
@@ -40,21 +40,21 @@
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'slowdowner' }"
-        @click="activeTab = 'slowdowner'"
+        @click="setActiveTab('slowdowner')"
       >
         🎚️ Slow Downer
       </button>
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'analyzer' }"
-        @click="activeTab = 'analyzer'"
+        @click="setActiveTab('analyzer')"
       >
         🔍 Music Analyzer
       </button>
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'multitrack' }"
-        @click="activeTab = 'multitrack'"
+        @click="setActiveTab('multitrack')"
         :disabled="!isAuthenticated"
         :title="!isAuthenticated ? 'Sign in required' : ''"
       >
@@ -63,7 +63,7 @@
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'performance' }"
-        @click="activeTab = 'performance'"
+        @click="setActiveTab('performance')"
         :disabled="!isAuthenticated"
         :title="!isAuthenticated ? 'Sign in required' : ''"
       >
@@ -104,7 +104,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
@@ -113,6 +114,8 @@ import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
 import LoginView from './components/LoginView.vue'
 
+const router = useRouter()
+const route = useRoute()
 const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
 
 const currentFile = ref(null)
@@ -121,14 +124,49 @@ const showLoginView = ref(false)
 
 const isAuthenticated = computed(() => checkAuth())
 
+// Map route names to tab names
+const routeToTab = {
+  'slowdowner': 'slowdowner',
+  'analyzer': 'analyzer',
+  'performance': 'performance',
+  'multitrack': 'multitrack'
+}
+
+// Sync activeTab with route
+watch(() => route.name, (routeName) => {
+  if (routeName && routeToTab[routeName]) {
+    activeTab.value = routeToTab[routeName]
+  }
+}, { immediate: true })
+
+// Update route when tab changes
+const setActiveTab = (tab) => {
+  if (tab === 'slowdowner') {
+    router.push('/slowdowner')
+  } else if (tab === 'analyzer') {
+    router.push('/analyzer')
+  } else if (tab === 'performance') {
+    router.push('/performance')
+  } else if (tab === 'multitrack') {
+    router.push('/multitrack')
+  }
+}
+
 // Protect routes - redirect to slowdowner if trying to access protected tabs without auth
 watch([isAuthenticated, activeTab], ([authenticated, tab]) => {
   if (!authenticated && (tab === 'multitrack' || tab === 'performance')) {
-    activeTab.value = 'slowdowner'
+    setActiveTab('slowdowner')
   }
   // Hide login view when user successfully authenticates
   if (authenticated) {
     showLoginView.value = false
+  }
+})
+
+// Handle route protection on mount
+onMounted(() => {
+  if (route.meta?.requiresAuth && !isAuthenticated.value) {
+    router.push('/slowdowner')
   }
 })
 
@@ -142,7 +180,7 @@ const changeFile = () => {
 
 const handleLogout = async () => {
   await logout()
-  activeTab.value = 'slowdowner'
+  setActiveTab('slowdowner')
   currentFile.value = null
 }
 </script>

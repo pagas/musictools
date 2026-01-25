@@ -46,7 +46,7 @@
       <!-- Header (not sticky) -->
       <div class="header-top">
         <div class="song-info">
-          <button class="btn-back" @click="selectedSongId = null" title="Back to Songs">
+          <button class="btn-back" @click="goToSongList" title="Back to Songs">
             ← Back
           </button>
           <div v-if="song" class="header-content-row">
@@ -135,7 +135,7 @@
             <span v-else-if="lastSaved">✓ Saved</span>
             <span v-else>💾 Save</span>
           </button>
-          <button class="btn-preview" @click="showPreview = true" title="Preview">
+          <button class="btn-preview" @click="openPreview" title="Preview">
             👁️ Preview
           </button>
         </div>
@@ -206,7 +206,7 @@
     </div>
 
     <!-- Preview Modal -->
-    <div v-if="showPreview && song" class="preview-modal" @click.self="showPreview = false">
+    <div v-if="showPreview && song" class="preview-modal" @click.self="closePreview">
       <div class="preview-content">
         <div class="preview-header">
           <div class="preview-title">
@@ -216,7 +216,7 @@
               <span>Time: {{ song.timeSignature }}</span>
             </div>
           </div>
-          <button class="btn-close" @click="showPreview = false" title="Close Preview">
+          <button class="btn-close" @click="closePreview" title="Close Preview">
             ✕
           </button>
         </div>
@@ -290,8 +290,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useSongs } from '../composables/useSongs'
 import { useAuth } from '../composables/useAuth'
+
+const router = useRouter()
+const route = useRoute()
 
 // Use Firestore for songs
 const { songs, loading: songsLoading, loadSongs, createSong, updateSong, deleteSong: deleteSongFromFirestore } = useSongs()
@@ -313,7 +317,12 @@ const createDefaultSong = () => ({
   ]
 })
 
-const selectedSongId = ref(null)
+// Initialize selectedSongId from route query
+const selectedSongId = ref(route.query.songId || null)
+let isUpdatingFromRoute = false
+
+// Computed property for showPreview from route
+const showPreview = computed(() => route.query.preview === 'true')
 
 // Auto-save debounce timer
 let saveTimer = null
@@ -452,6 +461,21 @@ const song = computed({
     }
   }
 })
+
+// Watch route changes to update selectedSongId
+watch(() => route.query, (query) => {
+  isUpdatingFromRoute = true
+  
+  if (query.songId && query.songId !== selectedSongId.value) {
+    selectedSongId.value = query.songId
+  } else if (!query.songId && selectedSongId.value) {
+    selectedSongId.value = null
+  }
+  
+  setTimeout(() => {
+    isUpdatingFromRoute = false
+  }, 100)
+}, { immediate: true })
 
 // Watch for song selection to reset initialization flag
 watch(() => selectedSongId.value, (newId, oldId) => {
@@ -612,7 +636,6 @@ const currentPreviewSectionIndex = ref(-1)
 const currentBar = ref(1) // 1-based index within section
 const currentBeat = ref(1) // 1-based index within bar
 const isPlaying = ref(false)
-const showPreview = ref(false)
 let playbackInterval = null
 
 const currentSection = computed(() => {
@@ -858,7 +881,7 @@ watch(() => song.value?.sections?.length, async () => {
   if (!song.value) return
   await nextTick()
   setupObserver()
-  if (showPreview.value) {
+  if (showPreview) {
     setupPreviewObserver()
   }
 })
@@ -881,8 +904,8 @@ watch(() => selectedSongId.value, async () => {
 })
 
 // Watch for preview mode to set up preview observer
-watch(() => showPreview.value, async () => {
-  if (showPreview.value) {
+watch(() => showPreview, async (isPreview) => {
+  if (isPreview) {
     await nextTick()
     setupPreviewObserver()
   } else {
@@ -1000,6 +1023,48 @@ const decrementBars = (section) => {
   }
 }
 
+// Router functions to update URL
+const updateRoute = () => {
+  if (isUpdatingFromRoute) return // Prevent circular updates
+  
+  const query = {}
+  if (selectedSongId.value) {
+    query.songId = selectedSongId.value
+  }
+  if (showPreview.value) {
+    query.preview = 'true'
+  }
+  router.push({ 
+    path: '/performance',
+    query: Object.keys(query).length > 0 ? query : {}
+  })
+}
+
+const goToSongList = () => {
+  selectedSongId.value = null
+  router.push({ path: '/performance' })
+}
+
+const openPreview = () => {
+  if (selectedSongId.value) {
+    router.push({ 
+      path: '/performance',
+      query: { songId: selectedSongId.value, preview: 'true' }
+    })
+  }
+}
+
+const closePreview = () => {
+  if (selectedSongId.value) {
+    router.push({ 
+      path: '/performance',
+      query: { songId: selectedSongId.value }
+    })
+  } else {
+    router.push({ path: '/performance' })
+  }
+}
+
 // Song management functions
 const createNewSong = async () => {
   if (!isAuthenticated()) {
@@ -1012,6 +1077,7 @@ const createNewSong = async () => {
 
   if (result.success) {
     selectedSongId.value = result.id
+    updateRoute()
     resetPlayback()
     // Mark as initialized after creation
     songInitialized.value = true
@@ -1030,6 +1096,7 @@ const createNewSong = async () => {
 const openSong = (songId) => {
   selectedSongId.value = songId
   resetPlayback()
+  updateRoute()
 }
 
 const deleteSong = async (songId) => {
@@ -1042,6 +1109,7 @@ const deleteSong = async (songId) => {
   if (result.success) {
     if (selectedSongId.value === songId) {
       selectedSongId.value = null
+      router.push({ path: '/performance' })
     }
   } else {
     alert('Failed to delete song: ' + (result.error || 'Unknown error'))
