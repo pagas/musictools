@@ -114,22 +114,60 @@
 
       <!-- Instrument Filter -->
       <div class="instrument-filter" v-if="song">
-        <button 
-          class="filter-btn" 
-          :class="{ active: selectedInstrument === null }"
-          @click="selectedInstrument = null"
-        >
-          All
-        </button>
-        <button 
-          v-for="inst in instruments" 
-          :key="inst"
-          class="filter-btn"
-          :class="{ active: selectedInstrument === inst }"
-          @click="selectedInstrument = inst"
-        >
-          {{ inst }}
-        </button>
+        <div class="instrument-list">
+          <button 
+            class="filter-btn" 
+            :class="{ active: selectedInstrument === null }"
+            @click="selectedInstrument = null"
+          >
+            All
+          </button>
+          <span 
+            v-for="inst in song.instruments || []" 
+            :key="inst"
+            class="instrument-tag"
+            :class="{ active: selectedInstrument === inst }"
+            @click="selectedInstrument = inst"
+          >
+            {{ inst }}
+            <button 
+              class="instrument-remove"
+              @click.stop="removeInstrument(inst)"
+              title="Remove instrument"
+            >
+              ×
+            </button>
+          </span>
+        </div>
+        <div class="instrument-manager">
+          <div class="instrument-dropdown-wrapper">
+            <select 
+              v-model="newInstrumentName" 
+              class="instrument-select"
+              @change="addInstrument"
+            >
+              <option value="">Add Instrument...</option>
+              <option value="Drums">Drums</option>
+              <option value="Bass">Bass</option>
+              <option value="Guitar">Guitar</option>
+              <option value="Keys">Keys</option>
+              <option value="Piano">Piano</option>
+              <option value="Vocals">Vocals</option>
+              <option value="Strings">Strings</option>
+              <option value="Brass">Brass</option>
+              <option value="Percussion">Percussion</option>
+              <option value="Synth">Synth</option>
+            </select>
+            <input 
+              v-model="customInstrumentName"
+              type="text"
+              placeholder="Or type custom name"
+              class="instrument-input"
+              @keyup.enter="addCustomInstrument"
+              @blur="addCustomInstrument"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Song Strip Overview -->
@@ -254,17 +292,16 @@
             :key="index" 
             class="preview-section-card"
           >
-            <div class="preview-section-header">
-              <h3 class="preview-section-name">{{ section.name }}</h3>
-              <div class="preview-section-meta">
-                <span>{{ section.bars }} bars</span>
-                <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
-              </div>
-            </div>
-
             <div class="preview-instruments-grid">
               <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
-                <div class="preview-instrument-name">{{ inst }}</div>
+                <div class="preview-instrument-header">
+                  <h3 class="preview-section-name" v-if="inst === visibleInstruments[0]">{{ section.name }}</h3>
+                  <div class="preview-section-meta" v-if="inst === visibleInstruments[0]">
+                    <span>{{ section.bars }} bars</span>
+                    <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
+                  </div>
+                  <div class="preview-instrument-name" v-if="visibleInstruments.length > 1">{{ inst }}</div>
+                </div>
                 <div class="preview-pattern-map">
                   <div 
                     v-for="(row, rowIndex) in getBarRows(section.bars)" 
@@ -276,7 +313,6 @@
                       :key="bar" 
                       class="preview-bar-container"
                     >
-                      <div class="preview-bar-label">{{ bar }}</div>
                       <div class="preview-bar-beats">
                         <div 
                           v-for="beat in beatsPerBar" 
@@ -314,6 +350,7 @@ const createDefaultSong = () => ({
   title: 'New Song',
   bpm: 120,
   timeSignature: '4/4',
+  instruments: ['Drums', 'Bass', 'Guitar', 'Keys'],
   sections: [
     {
       name: 'Intro',
@@ -503,8 +540,23 @@ watch(() => song.value?.sections, () => {
   }
 }, { deep: true, flush: 'post' })
 
-const instruments = ref(['Drums', 'Bass', 'Guitar', 'Keys'])
+watch(() => song.value?.instruments, () => {
+  if (song.value && selectedSongId.value && songInitialized.value) {
+    autoSave(selectedSongId.value, song.value)
+  }
+}, { deep: true, flush: 'post' })
+
 const selectedInstrument = ref(null)
+
+// Instrument management
+const newInstrumentName = ref('')
+const customInstrumentName = ref('')
+
+// Get instruments from song, fallback to default
+const instruments = computed(() => {
+  if (!song.value) return []
+  return song.value.instruments || ['Drums', 'Bass', 'Guitar', 'Keys']
+})
 
 const visibleInstruments = computed(() => {
   if (selectedInstrument.value) {
@@ -512,6 +564,58 @@ const visibleInstruments = computed(() => {
   }
   return instruments.value
 })
+
+// Add instrument from dropdown
+const addInstrument = () => {
+  if (!song.value || !newInstrumentName.value) return
+  
+  if (!song.value.instruments) {
+    song.value.instruments = []
+  }
+  
+  if (!song.value.instruments.includes(newInstrumentName.value)) {
+    song.value.instruments.push(newInstrumentName.value)
+    newInstrumentName.value = '' // Reset dropdown
+  }
+}
+
+// Add custom instrument
+const addCustomInstrument = () => {
+  if (!song.value || !customInstrumentName.value.trim()) return
+  
+  const instrumentName = customInstrumentName.value.trim()
+  
+  if (!song.value.instruments) {
+    song.value.instruments = []
+  }
+  
+  if (!song.value.instruments.includes(instrumentName)) {
+    song.value.instruments.push(instrumentName)
+    customInstrumentName.value = '' // Clear input
+  }
+}
+
+// Remove instrument
+const removeInstrument = (instrumentName) => {
+  if (!song.value || !song.value.instruments) return
+  
+  const index = song.value.instruments.indexOf(instrumentName)
+  if (index > -1) {
+    song.value.instruments.splice(index, 1)
+    
+    // Clear selection if removed instrument was selected
+    if (selectedInstrument.value === instrumentName) {
+      selectedInstrument.value = null
+    }
+    
+    // Clean up patterns for removed instrument in all sections
+    song.value.sections.forEach(section => {
+      if (section.patterns && section.patterns[instrumentName]) {
+        delete section.patterns[instrumentName]
+      }
+    })
+  }
+}
 
 const currentSectionIndex = ref(0)
 const currentBar = ref(1) // 1-based index within section
@@ -827,6 +931,11 @@ watch(() => song.value, (newSong, oldSong) => {
   if (newSong && newSong !== oldSong && selectedSongId.value) {
     // Mark that we're updating from Firestore to prevent save loops
     isUpdatingFromFirestore = true
+    
+    // Ensure instruments array exists, initialize with defaults if missing
+    if (!newSong.instruments || newSong.instruments.length === 0) {
+      newSong.instruments = ['Drums', 'Bass', 'Guitar', 'Keys']
+    }
     
     // Update last saved data to match current song
     lastSavedData = getSongDataForComparison(newSong)
@@ -1159,12 +1268,115 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .instrument-filter {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 24px;
+  padding: 12px 24px;
   background: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
-  overflow-x: auto;
-  white-space: nowrap;
+}
+
+.instrument-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.instrument-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.instrument-dropdown-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.instrument-select {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  color: #333;
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.instrument-input {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  color: #333;
+  font-size: 0.85rem;
+  max-width: 200px;
+}
+
+.instrument-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.instrument-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.instrument-tag:hover {
+  background: #f0f2f5;
+  color: #333;
+}
+
+.instrument-tag.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.instrument-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.instrument-tag:hover .instrument-remove {
+  opacity: 1;
+}
+
+.instrument-remove:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.instrument-tag.active .instrument-remove:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .filter-btn {
@@ -1512,7 +1724,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .preview-header {
   background: #fff;
-  padding: 20px 24px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1521,15 +1733,15 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .preview-title h2 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
   color: #333;
 }
 
 .preview-meta {
   display: flex;
-  gap: 16px;
-  font-size: 0.9rem;
+  gap: 12px;
+  font-size: 0.85rem;
   color: #666;
 }
 
@@ -1557,7 +1769,7 @@ watch(() => song.value, (newSong, oldSong) => {
   position: sticky;
   top: 0;
   display: flex;
-  height: 60px;
+  height: 40px;
   width: 100%;
   background: #e0e0e0;
   overflow-x: auto;
@@ -1571,23 +1783,24 @@ watch(() => song.value, (newSong, oldSong) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #666;
   background: #d1d5db;
   white-space: nowrap;
   overflow: hidden;
-  padding: 4px 8px;
-  min-width: 80px;
+  padding: 2px 6px;
+  min-width: 60px;
 }
 
 .preview-strip-name {
   font-weight: 700;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  font-size: 0.7rem;
 }
 
 .preview-strip-bars {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #888;
   font-weight: 400;
 }
@@ -1595,37 +1808,51 @@ watch(() => song.value, (newSong, oldSong) => {
 .preview-sections-container {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 12px;
   scroll-behavior: smooth;
 }
 
 .preview-section-card {
   background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  border-left: 6px solid #667eea;
+  border-left: 4px solid #667eea;
 }
 
-.preview-section-header {
-  margin-bottom: 20px;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 12px;
+.preview-instruments-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-instrument-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-instrument-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+  flex-shrink: 0;
 }
 
 .preview-section-name {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 1rem;
   font-weight: 700;
   color: #2d3748;
 }
 
 .preview-section-meta {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   color: #718096;
 }
 
@@ -1633,82 +1860,61 @@ watch(() => song.value, (newSong, oldSong) => {
   font-style: italic;
   color: #718096;
   background: #fffbeb;
-  padding: 4px 12px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
   border: 1px solid #fef3c7;
-}
-
-.preview-instruments-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.preview-instrument-row {
-  display: flex;
-  align-items: flex-start;
+  font-size: 0.7rem;
 }
 
 .preview-instrument-name {
-  width: 100px;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: #4a5568;
-  padding-top: 4px;
+  min-width: 80px;
 }
 
 .preview-pattern-map {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
 }
 
 .preview-bar-row {
   display: flex;
-  gap: 12px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
 .preview-bar-container {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
   align-items: center;
-}
-
-.preview-bar-label {
-  font-size: 0.75rem;
-  color: #a0aec0;
-  font-weight: 700;
-  text-align: center;
-  min-width: 30px;
 }
 
 .preview-bar-beats {
   display: flex;
-  gap: 3px;
+  gap: 2px;
   background: #f7fafc;
-  padding: 4px;
-  border-radius: 6px;
-  border: 2px solid #e2e8f0;
+  padding: 2px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
 }
 
 .preview-beat-block {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
   background: #edf2f7;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   color: #a0aec0;
   transition: all 0.15s;
 }
 
 .preview-pattern-icon {
-  font-size: 1rem;
+  font-size: 0.75rem;
 }
 
 .preview-beat-block.pattern-play {
@@ -1750,19 +1956,71 @@ watch(() => song.value, (newSong, oldSong) => {
   }
 
   .preview-header {
-    padding: 16px;
+    padding: 10px 12px;
   }
 
   .preview-title h2 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
 
   .preview-sections-container {
-    padding: 16px;
+    padding: 8px;
   }
 
   .preview-section-card {
-    padding: 16px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+
+  .preview-instrument-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .preview-instrument-header {
+    min-width: auto;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .preview-section-name {
+    font-size: 0.9rem;
+  }
+
+  .preview-section-meta {
+    font-size: 0.7rem;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .preview-instrument-name {
+    min-width: auto;
+    font-size: 0.8rem;
+  }
+
+  .preview-pattern-map {
+    width: 100%;
+  }
+
+  .preview-bar-row {
+    gap: 3px;
+  }
+
+  .preview-bar-beats {
+    gap: 1px;
+    padding: 1px;
+  }
+
+  .preview-beat-block {
+    width: 20px;
+    height: 20px;
+    font-size: 0.65rem;
+  }
+
+  .preview-pattern-icon {
+    font-size: 0.65rem;
   }
 }
 </style>
