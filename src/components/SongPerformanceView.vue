@@ -264,13 +264,46 @@
                   <div v-for="bar in row" :key="bar" class="bar-container">
                     <div class="bar-header">
                       <div class="bar-label">{{ bar }}</div>
-                      <button 
-                        class="bar-rest-btn" 
-                        @click="setBarToRest(section, inst, bar)" 
-                        title="Set all beats in this bar to rest"
-                      >
-                        —
-                      </button>
+                      <div class="bar-menu-wrapper">
+                        <button 
+                          class="bar-menu-btn" 
+                          @click.stop="toggleBarMenu(section, inst, bar)"
+                          :title="`Bar ${bar} options`"
+                        >
+                          ⋯
+                        </button>
+                        <div 
+                          v-if="openBarMenu?.section === section && openBarMenu?.instrument === inst && openBarMenu?.bar === bar"
+                          class="bar-menu-dropdown"
+                          @click.stop
+                        >
+                          <button 
+                            class="bar-menu-item" 
+                            @click="setBarPattern(section, inst, bar, 'play')"
+                          >
+                            <span class="menu-icon">●</span> Set all to Play
+                          </button>
+                          <button 
+                            class="bar-menu-item" 
+                            @click="setBarPattern(section, inst, bar, 'rest')"
+                          >
+                            <span class="menu-icon">—</span> Set all to Rest
+                          </button>
+                          <button 
+                            class="bar-menu-item" 
+                            @click="setBarPattern(section, inst, bar, 'fill')"
+                          >
+                            <span class="menu-icon">⚡</span> Set all to Fill
+                          </button>
+                          <div class="bar-menu-divider"></div>
+                          <button 
+                            class="bar-menu-item bar-menu-item-danger" 
+                            @click="deleteBar(section, bar)"
+                          >
+                            <span class="menu-icon">🗑️</span> Delete Bar
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <div class="bar-beats">
                       <div v-for="beat in beatsPerBar" :key="beat" class="beat-block"
@@ -333,6 +366,9 @@ let isUpdatingFromRoute = false
 
 // Computed property for showPreview from route
 const showPreview = computed(() => route.query.preview === 'true')
+
+// Bar menu state
+const openBarMenu = ref(null) // { section, instrument, bar } or null
 
 // Auto-save debounce timer
 let saveTimer = null
@@ -803,8 +839,22 @@ const getBarPatternLabel = (section, bar) => {
   }
 }
 
-// Set all beats in a bar to rest
-const setBarToRest = (section, instrument, bar) => {
+// Toggle bar menu dropdown
+const toggleBarMenu = (section, instrument, bar) => {
+  if (openBarMenu.value?.section === section && openBarMenu.value?.instrument === instrument && openBarMenu.value?.bar === bar) {
+    openBarMenu.value = null
+  } else {
+    openBarMenu.value = { section, instrument, bar }
+  }
+}
+
+// Close bar menu when clicking outside
+const closeBarMenu = () => {
+  openBarMenu.value = null
+}
+
+// Set all beats in a bar to a specific pattern
+const setBarPattern = (section, instrument, bar, pattern) => {
   if (!song.value) return
   
   if (!section.patterns) {
@@ -814,11 +864,60 @@ const setBarToRest = (section, instrument, bar) => {
     section.patterns[instrument] = {}
   }
   
-  // Set all beats in the bar to rest
+  // Set all beats in the bar to the specified pattern
   for (let beat = 1; beat <= beatsPerBar.value; beat++) {
     const patternKey = `${bar}-${beat}`
-    section.patterns[instrument][patternKey] = 'rest'
+    section.patterns[instrument][patternKey] = pattern
   }
+  
+  // Close menu
+  openBarMenu.value = null
+  
+  // Auto-save the change
+  if (selectedSongId.value && songInitialized.value) {
+    autoSave(selectedSongId.value, song.value)
+  }
+}
+
+// Delete a bar from a section
+const deleteBar = (section, bar) => {
+  if (!song.value || section.bars <= 1) return
+  
+  if (!window.confirm(`Are you sure you want to delete bar ${bar}? This will remove the bar and shift all subsequent bars.`)) {
+    openBarMenu.value = null
+    return
+  }
+  
+  // Remove patterns for the deleted bar for all instruments
+  if (section.patterns) {
+    for (const instrument in section.patterns) {
+      if (section.patterns[instrument]) {
+        // Remove patterns for the deleted bar
+        for (let beat = 1; beat <= beatsPerBar.value; beat++) {
+          const patternKey = `${bar}-${beat}`
+          delete section.patterns[instrument][patternKey]
+        }
+        
+        // Renumber all bars after the deleted one
+        for (let b = bar + 1; b <= section.bars; b++) {
+          for (let beat = 1; beat <= beatsPerBar.value; beat++) {
+            const oldKey = `${b}-${beat}`
+            const newKey = `${b - 1}-${beat}`
+            if (section.patterns[instrument][oldKey] !== undefined) {
+              section.patterns[instrument][newKey] = section.patterns[instrument][oldKey]
+              delete section.patterns[instrument][oldKey]
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Decrease bar count
+  section.bars--
+  
+  // Close menu
+  openBarMenu.value = null
   
   // Auto-save the change
   if (selectedSongId.value && songInitialized.value) {
@@ -891,6 +990,9 @@ onMounted(() => {
   if (song.value) {
     setupObserver()
   }
+  
+  // Close bar menu when clicking outside
+  document.addEventListener('click', closeBarMenu)
 })
 
 // Cleanup save timer on unmount
@@ -1164,6 +1266,8 @@ onMounted(() => {
   if (isAuthenticated()) {
     loadSongs()
   }
+  
+  // Note: closeBarMenu listener is already added in the first onMounted hook
 })
 
 // Watch for when song is loaded from Firestore and mark as initialized
@@ -1938,10 +2042,13 @@ watch(() => song.value, (newSong, oldSong) => {
   margin-bottom: 4px;
 }
 
-.bar-rest-btn {
+.bar-menu-wrapper {
   position: absolute;
   right: -8px;
   top: 0;
+}
+
+.bar-menu-btn {
   background: transparent;
   border: 1px solid #cbd5e0;
   border-radius: 50%;
@@ -1951,7 +2058,7 @@ watch(() => song.value, (newSong, oldSong) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   color: #718096;
   cursor: pointer;
   transition: all 0.15s;
@@ -1960,13 +2067,67 @@ watch(() => song.value, (newSong, oldSong) => {
   -moz-user-select: none;
   -ms-user-select: none;
   opacity: 0.6;
+  line-height: 1;
 }
 
-.bar-rest-btn:hover {
+.bar-menu-btn:hover {
   background: #f7fafc;
   border-color: #a0aec0;
   color: #4a5568;
   opacity: 1;
+}
+
+.bar-menu-dropdown {
+  position: absolute;
+  top: 20px;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.bar-menu-item {
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #4a5568;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.15s;
+}
+
+.bar-menu-item:hover {
+  background: #f7fafc;
+}
+
+.bar-menu-item-danger {
+  color: #e53e3e;
+}
+
+.bar-menu-item-danger:hover {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.bar-menu-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 0;
+}
+
+.menu-icon {
+  font-size: 0.875rem;
+  width: 16px;
+  text-align: center;
 }
 
 .bar-label {
