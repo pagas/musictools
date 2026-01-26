@@ -1913,6 +1913,10 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .beat-block {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   width: 24px;
   height: 24px;
   border-radius: 3px;
@@ -2249,6 +2253,10 @@ watch(() => song.value, (newSong, oldSong) => {
   justify-content: center;
   font-size: 0.7rem;
   color: #a0aec0;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   transition: all 0.15s;
 }
 
