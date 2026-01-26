@@ -137,8 +137,7 @@
 
             <div class="song-info-content">
 
-              <input v-model="song.title" class="song-title-input" placeholder="Song Title"
-                @blur="autoSave(selectedSongId, song)" />
+              <input v-model="song.title" class="song-title-input" placeholder="Song Title" />
               <div class="meta-info">
                 <span class="bpm">
                   <span class="label">BPM</span>
@@ -148,7 +147,6 @@
                     min="1" 
                     max="300" 
                     class="meta-value-input"
-                    @blur="autoSave(selectedSongId, song)"
                     @keyup.enter="$event.target.blur()"
                   />
                 </span>
@@ -160,7 +158,6 @@
                     pattern="\d+/\d+"
                     placeholder="4/4"
                     class="meta-value-input"
-                    @blur="autoSave(selectedSongId, song)"
                     @keyup.enter="$event.target.blur()"
                   />
                 </span>
@@ -370,23 +367,13 @@ const showPreview = computed(() => route.query.preview === 'true')
 // Bar menu state
 const openBarMenu = ref(null) // { section, instrument, bar } or null
 
-// Auto-save debounce timer
-let saveTimer = null
-const AUTO_SAVE_DELAY = 2000 // 2 second delay
-
 // Save state
 const saving = ref(false)
 const lastSaved = ref(false)
 let savedTimeout = null
 
-// Track if song is initialized (to prevent auto-save on initial load)
+// Track if song is initialized
 const songInitialized = ref(false)
-
-// Track last saved data to prevent unnecessary saves
-let lastSavedData = null
-
-// Flag to prevent saves during Firestore updates
-let isUpdatingFromFirestore = false
 
 // Manual save function (immediate save)
 const manualSave = async () => {
@@ -398,19 +385,11 @@ const manualSave = async () => {
   lastSaved.value = false
 
   try {
-    // Clear any pending auto-save
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
-
     // Remove metadata fields before saving
     const { id, userId, createdAt, updatedAt, ...dataToSave } = song.value
     const result = await updateSong(selectedSongId.value, dataToSave)
 
     if (result.success) {
-      // Update last saved data
-      lastSavedData = getSongDataForComparison(song.value)
       lastSaved.value = true
       // Clear the "Saved" indicator after 2 seconds
       if (savedTimeout) {
@@ -430,63 +409,6 @@ const manualSave = async () => {
   }
 }
 
-// Helper to compare song data (excluding metadata)
-const getSongDataForComparison = (songData) => {
-  if (!songData) return null
-  const { id, userId, createdAt, updatedAt, ...data } = songData
-  return JSON.stringify(data)
-}
-
-// Auto-save function
-const autoSave = (songId, songData) => {
-  if (!songId || !isAuthenticated() || isUpdatingFromFirestore) return
-
-  // Check if data actually changed
-  const currentData = getSongDataForComparison(songData)
-  if (currentData === lastSavedData) {
-    return // No changes, skip save
-  }
-
-  // Clear existing timer
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-  }
-
-  // Set new timer
-  saveTimer = setTimeout(async () => {
-    if (saving.value || isUpdatingFromFirestore) return // Don't auto-save if manual save is in progress or Firestore update
-
-    // Double-check data hasn't changed while waiting
-    const currentDataCheck = getSongDataForComparison(songData)
-    if (currentDataCheck === lastSavedData) {
-      return // Data already saved, skip
-    }
-
-    try {
-      saving.value = true
-      // Remove metadata fields before saving
-      const { id, userId, createdAt, updatedAt, ...dataToSave } = songData
-      const result = await updateSong(songId, dataToSave)
-
-      if (result.success) {
-        // Update last saved data
-        lastSavedData = getSongDataForComparison(songData)
-        lastSaved.value = true
-        // Clear the "Saved" indicator after 2 seconds
-        if (savedTimeout) {
-          clearTimeout(savedTimeout)
-        }
-        savedTimeout = setTimeout(() => {
-          lastSaved.value = false
-        }, 2000)
-      }
-    } catch (error) {
-      console.error('Error auto-saving song:', error)
-    } finally {
-      saving.value = false
-    }
-  }, AUTO_SAVE_DELAY)
-}
 
 // Show song list when no song is selected
 const showSongList = computed(() => selectedSongId.value === null)
@@ -502,8 +424,6 @@ const song = computed({
     const index = songs.value.findIndex(s => s.id === selectedSongId.value)
     if (index !== -1) {
       songs.value[index] = value
-      // Auto-save when song is updated
-      autoSave(selectedSongId.value, value)
     }
   }
 })
@@ -556,36 +476,6 @@ watch(() => selectedSongId.value, (newId, oldId) => {
   }
 })
 
-// Watch for changes in song properties and auto-save (only after initialization)
-watch(() => song.value?.title, () => {
-  if (song.value && selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
-}, { flush: 'post' })
-
-watch(() => song.value?.bpm, () => {
-  if (song.value && selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
-}, { flush: 'post' })
-
-watch(() => song.value?.timeSignature, () => {
-  if (song.value && selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
-}, { flush: 'post' })
-
-watch(() => song.value?.sections, () => {
-  if (song.value && selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
-}, { deep: true, flush: 'post' })
-
-watch(() => song.value?.instruments, () => {
-  if (song.value && selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
-}, { deep: true, flush: 'post' })
 
 const selectedInstrument = ref(null)
 
@@ -603,8 +493,6 @@ watch(selectedInstrument, (newInstrument) => {
       song.value.metadata = {}
     }
     song.value.metadata.selectedInstrument = newInstrument
-    // Auto-save the change
-    autoSave(selectedSongId.value, song.value)
   }
 })
 
@@ -872,11 +760,6 @@ const setBarPattern = (section, instrument, bar, pattern) => {
   
   // Close menu
   openBarMenu.value = null
-  
-  // Auto-save the change
-  if (selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
 }
 
 // Delete a bar from a section
@@ -918,11 +801,6 @@ const deleteBar = (section, bar) => {
   
   // Close menu
   openBarMenu.value = null
-  
-  // Auto-save the change
-  if (selectedSongId.value && songInitialized.value) {
-    autoSave(selectedSongId.value, song.value)
-  }
 }
 
 const togglePattern = (section, instrument, bar, beat) => {
@@ -993,13 +871,6 @@ onMounted(() => {
   
   // Close bar menu when clicking outside
   document.addEventListener('click', closeBarMenu)
-})
-
-// Cleanup save timer on unmount
-onUnmounted(() => {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-  }
 })
 
 onUnmounted(() => {
@@ -1216,13 +1087,6 @@ const createNewSong = async () => {
     resetPlayback()
     // Mark as initialized after creation
     songInitialized.value = true
-    // Wait for song to be loaded from Firestore before setting lastSavedData
-    setTimeout(() => {
-      if (song.value) {
-        lastSavedData = getSongDataForComparison(song.value)
-        isUpdatingFromFirestore = false
-      }
-    }, 300)
   } else {
     alert('Failed to create song: ' + (result.error || 'Unknown error'))
   }
@@ -1273,31 +1137,19 @@ onMounted(() => {
 // Watch for when song is loaded from Firestore and mark as initialized
 watch(() => song.value, (newSong, oldSong) => {
   if (newSong && newSong !== oldSong && selectedSongId.value) {
-    // Mark that we're updating from Firestore to prevent save loops
-    isUpdatingFromFirestore = true
-
     // Ensure instruments array exists, initialize with defaults if missing
     if (!newSong.instruments || newSong.instruments.length === 0) {
       newSong.instruments = ['Drums', 'Bass', 'Guitar', 'Keys']
     }
 
-    // Update last saved data to match current song
-    lastSavedData = getSongDataForComparison(newSong)
-
     // Song loaded, mark as initialized after a brief delay
     setTimeout(() => {
       if (song.value && selectedSongId.value) {
         songInitialized.value = true
-        // Allow saves again after initialization
-        setTimeout(() => {
-          isUpdatingFromFirestore = false
-        }, 500)
       }
     }, 200)
   } else if (!newSong) {
     songInitialized.value = false
-    lastSavedData = null
-    isUpdatingFromFirestore = false
   }
 }, { immediate: true })
 </script>
