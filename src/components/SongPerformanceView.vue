@@ -181,7 +181,16 @@
               <div class="pattern-map">
                 <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="bar-row">
                   <div v-for="bar in row" :key="bar" class="bar-container">
-                    <div class="bar-label">{{ bar }}</div>
+                    <div class="bar-header">
+                      <div class="bar-label">{{ bar }}</div>
+                      <button 
+                        class="bar-rest-btn" 
+                        @click="setBarToRest(section, inst, bar)" 
+                        title="Set all beats in this bar to rest"
+                      >
+                        —
+                      </button>
+                    </div>
                     <div class="bar-beats">
                       <div v-for="beat in beatsPerBar" :key="beat" class="beat-block"
                         :class="getPatternClass(section, inst, bar, beat)"
@@ -790,6 +799,29 @@ const getBarPatternLabel = (section, bar) => {
     case 'fill': return 'Fill'
     case 'play': return 'Play'
     default: return 'Play'
+  }
+}
+
+// Set all beats in a bar to rest
+const setBarToRest = (section, instrument, bar) => {
+  if (!song.value) return
+  
+  if (!section.patterns) {
+    section.patterns = {}
+  }
+  if (!section.patterns[instrument]) {
+    section.patterns[instrument] = {}
+  }
+  
+  // Set all beats in the bar to rest
+  for (let beat = 1; beat <= beatsPerBar.value; beat++) {
+    const patternKey = `${bar}-${beat}`
+    section.patterns[instrument][patternKey] = 'rest'
+  }
+  
+  // Auto-save the change
+  if (selectedSongId.value && songInitialized.value) {
+    autoSave(selectedSongId.value, song.value)
   }
 }
 
@@ -1889,10 +1921,51 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .bar-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
   align-items: center;
+}
+
+.bar-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.bar-rest-btn {
+  position: absolute;
+  right: -8px;
+  top: 0;
+  background: transparent;
+  border: 1px solid #cbd5e0;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  color: #718096;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  opacity: 0.6;
+}
+
+.bar-rest-btn:hover {
+  background: #f7fafc;
+  border-color: #a0aec0;
+  color: #4a5568;
+  opacity: 1;
 }
 
 .bar-label {
