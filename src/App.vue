@@ -81,11 +81,11 @@
 
     <main>
       <FileUpload
-        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance'"
+        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin'"
         @file-selected="handleFileSelected"
       />
       
-      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance'" class="file-info">
+      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <button class="btn-change" @click="changeFile">Change File</button>
       </div>

@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { collection, query, getDocs, doc, updateDoc, getDoc, setDoc, deleteDoc, where } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth'
+import { db, auth } from '../firebase/config'
 import { useAuth } from './useAuth'
 
 const { user } = useAuth()
@@ -108,6 +109,84 @@ export const fetchUsers = async () => {
   }
 }
 
+// Create a new user
+// Note: This only creates a user document in Firestore with pending status
+// The user will need to sign up with the same email/password to activate their account
+// For full user creation with Firebase Auth, you would need a backend/Cloud Function using Admin SDK
+export const createUser = async (email, password, displayName, role = 'user') => {
+  try {
+    // Check if user already exists in Firestore
+    const usersCollection = collection(db, 'users')
+    const usersSnapshot = await getDocs(usersCollection)
+    
+    const existingUser = usersSnapshot.docs.find(doc => {
+      const data = doc.data()
+      return data.email && data.email.toLowerCase() === email.toLowerCase()
+    })
+    
+    if (existingUser) {
+      return { 
+        success: false, 
+        error: 'An account with this email already exists.' 
+      }
+    }
+    
+    // Generate a temporary UID (we'll use a timestamp-based ID)
+    // When the user actually signs up, their real UID will be used
+    const tempUid = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Create user document in Firestore with pending status
+    // Store password hash hint (in production, you'd want to hash this properly)
+    // For now, we'll just mark it as pending and the user will sign up normally
+    const userDocRef = doc(db, 'users', tempUid)
+    await setDoc(userDocRef, {
+      email: email.toLowerCase(),
+      displayName: displayName || null,
+      role: role,
+      status: 'pending', // User needs to sign up to activate
+      createdAt: new Date().toISOString(),
+      // Note: In production, you should NOT store passwords in Firestore
+      // This is a temporary solution - the user will need to sign up with this password
+      // For production, use Firebase Admin SDK on a backend to create users properly
+    })
+    
+    // Add to cache
+    userRolesCache.value[tempUid] = role
+    
+    // Add to users list
+    usersList.value.push({
+      uid: tempUid,
+      email: email,
+      displayName: displayName || null,
+      role: role,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    })
+    
+    // Sort users list by email
+    usersList.value.sort((a, b) => {
+      const emailA = (a.email || '').toLowerCase()
+      const emailB = (b.email || '').toLowerCase()
+      return emailA.localeCompare(emailB)
+    })
+    
+    return { 
+      success: true, 
+      user: { uid: tempUid, email, displayName, role },
+      message: 'User created. They will need to sign up with this email and password to activate their account.'
+    }
+  } catch (error) {
+    console.error('Error creating user:', error)
+    let errorMessage = 'Failed to create user. Please try again.'
+    
+    if (error.message) {
+      errorMessage = error.message
+    }
+    
+    return { success: false, error: errorMessage }
+  }
+}
+
 // Delete user from Firestore
 export const deleteUser = async (userId) => {
   try {
@@ -142,6 +221,7 @@ export function useAdmin() {
     isAdmin,
     getUserRole,
     updateUserRole,
+    createUser,
     deleteUser,
     fetchUsers,
     usersList,
