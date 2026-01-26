@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getFunctions } from 'firebase/functions'
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -25,5 +26,8 @@ export const auth = getAuth(app)
 
 // Initialize Firestore
 export const db = getFirestore(app)
+
+// Initialize Cloud Functions (us-central1 region)
+export const functions = getFunctions(app, 'us-central1')
 
 export default app

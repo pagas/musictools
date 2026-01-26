@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { collection, query, getDocs, doc, updateDoc, getDoc, setDoc, deleteDoc, where } from 'firebase/firestore'
-import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from 'firebase/auth'
-import { db, auth } from '../firebase/config'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '../firebase/config'
 import { useAuth } from './useAuth'
 
 const { user } = useAuth()
@@ -109,57 +109,24 @@ export const fetchUsers = async () => {
   }
 }
 
-// Create a new user
-// Note: This only creates a user document in Firestore with pending status
-// The user will need to sign up with the same email/password to activate their account
-// For full user creation with Firebase Auth, you would need a backend/Cloud Function using Admin SDK
+// Create a new user using Cloud Function
+// This uses Firebase Admin SDK on the backend, so the admin stays logged in
 export const createUser = async (email, password, displayName, role = 'user') => {
   try {
-    // Check if user already exists in Firestore
-    const usersCollection = collection(db, 'users')
-    const usersSnapshot = await getDocs(usersCollection)
+    const createUserFunction = httpsCallable(functions, 'createUser')
+    const result = await createUserFunction({ email, password, displayName, role })
     
-    const existingUser = usersSnapshot.docs.find(doc => {
-      const data = doc.data()
-      return data.email && data.email.toLowerCase() === email.toLowerCase()
-    })
-    
-    if (existingUser) {
-      return { 
-        success: false, 
-        error: 'An account with this email already exists.' 
-      }
-    }
-    
-    // Generate a temporary UID (we'll use a timestamp-based ID)
-    // When the user actually signs up, their real UID will be used
-    const tempUid = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    // Create user document in Firestore with pending status
-    // Store password hash hint (in production, you'd want to hash this properly)
-    // For now, we'll just mark it as pending and the user will sign up normally
-    const userDocRef = doc(db, 'users', tempUid)
-    await setDoc(userDocRef, {
-      email: email.toLowerCase(),
-      displayName: displayName || null,
-      role: role,
-      status: 'pending', // User needs to sign up to activate
-      createdAt: new Date().toISOString(),
-      // Note: In production, you should NOT store passwords in Firestore
-      // This is a temporary solution - the user will need to sign up with this password
-      // For production, use Firebase Admin SDK on a backend to create users properly
-    })
+    const newUser = result.data
     
     // Add to cache
-    userRolesCache.value[tempUid] = role
+    userRolesCache.value[newUser.uid] = newUser.role
     
     // Add to users list
     usersList.value.push({
-      uid: tempUid,
-      email: email,
-      displayName: displayName || null,
-      role: role,
-      status: 'pending',
+      uid: newUser.uid,
+      email: newUser.email,
+      displayName: newUser.displayName || null,
+      role: newUser.role,
       createdAt: new Date().toISOString()
     })
     
@@ -172,14 +139,20 @@ export const createUser = async (email, password, displayName, role = 'user') =>
     
     return { 
       success: true, 
-      user: { uid: tempUid, email, displayName, role },
-      message: 'User created. They will need to sign up with this email and password to activate their account.'
+      user: newUser
     }
   } catch (error) {
     console.error('Error creating user:', error)
     let errorMessage = 'Failed to create user. Please try again.'
     
-    if (error.message) {
+    // Extract error message from Firebase Functions error
+    if (error.code === 'functions/unauthenticated') {
+      errorMessage = 'You must be authenticated to create users.'
+    } else if (error.code === 'functions/permission-denied') {
+      errorMessage = 'Only admins can create users.'
+    } else if (error.code === 'functions/invalid-argument') {
+      errorMessage = error.message || 'Invalid input provided.'
+    } else if (error.message) {
       errorMessage = error.message
     }
     

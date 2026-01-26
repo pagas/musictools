@@ -14,6 +14,13 @@ node_modules
 dist
 dist-ssr
 
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+functions/node_modules/
+
 # Lock files (keep pnpm-lock.yaml, ignore others)
 yarn.lock
 package-lock.json

@@ -267,10 +267,6 @@ const handleCreateUser = async () => {
   
   if (result.success) {
     closeCreateForm()
-    // Show message if admin needs to re-authenticate
-    if (result.requiresReauth && result.message) {
-      alert(result.message)
-    }
   } else {
     createError.value = result.error || 'Failed to create user'
   }
