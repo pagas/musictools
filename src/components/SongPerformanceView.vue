@@ -1,5 +1,86 @@
 <template>
-  <div class="performance-view">
+  <!-- Preview View (Full Screen) - Teleported to body -->
+  <Teleport to="body">
+    <div v-if="showPreview && song" class="preview-view">
+    <div class="preview-header">
+      <div class="preview-title">
+        <h2>{{ song.title }}</h2>
+        <div class="preview-meta">
+          <span>BPM: {{ song.bpm }}</span>
+          <span>Time: {{ song.timeSignature }}</span>
+        </div>
+      </div>
+      <button class="btn-close" @click="closePreview" title="Close Preview">
+        ✕
+      </button>
+      </div>
+
+      <!-- Song Strip (Sticky) -->
+      <div class="preview-song-strip" v-if="song">
+      <div 
+        v-for="(section, sectionIndex) in song.sections" 
+        :key="sectionIndex" 
+        class="preview-strip-segment"
+        :class="{ 'preview-strip-segment-active': currentPreviewSectionIndex === sectionIndex }"
+        :style="{ flex: section.bars }"
+        @click="scrollToPreviewSection(sectionIndex)"
+      >
+        <div class="preview-strip-section-header">
+          <span class="preview-strip-name">{{ section.name }}</span>
+          <span class="preview-strip-bars">{{ section.bars }} bars</span>
+        </div>
+        <div class="preview-strip-bars-container">
+          <template v-for="bar in Array.from({ length: section.bars }, (_, i) => i + 1)" :key="bar">
+            <div 
+              v-if="bar > 1 && (bar - 1) % barsPerPhrase === 0"
+              class="preview-strip-phase-marker"
+              :title="`Phase marker at bar ${bar}`"
+            ></div>
+            <div 
+              class="preview-strip-bar-segment"
+              :class="getBarPatternClass(section, bar)"
+              :style="{ flex: 1 }"
+              :title="`Bar ${bar}: ${getBarPatternLabel(section, bar)}`"
+            ></div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview Sections Container -->
+    <div class="preview-sections-container">
+      <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card" :class="{ 'preview-section-card-active': currentPreviewSectionIndex === index }" :id="'preview-section-' + index">
+        <div class="preview-instruments-grid">
+          <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
+            <div class="preview-instrument-header">
+              <h3 class="preview-section-name" v-if="inst === visibleInstruments[0]">{{ section.name }}</h3>
+              <div class="preview-section-meta" v-if="inst === visibleInstruments[0]">
+                <span>{{ section.bars }} bars</span>
+                <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
+              </div>
+              <div class="preview-instrument-name" v-if="visibleInstruments.length > 1">{{ inst }}</div>
+            </div>
+            <div class="preview-pattern-map">
+              <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
+                <div v-for="bar in row" :key="bar" class="preview-bar-container">
+                  <div class="preview-bar-beats">
+                    <div v-for="beat in beatsPerBar" :key="beat" class="preview-beat-block"
+                      :class="getPatternClass(section, inst, bar, beat)"
+                      :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`">
+                      <span class="preview-pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <div v-if="!showPreview || !song" class="performance-view">
     <!-- Song List View -->
     <div v-if="showSongList" class="song-list-view">
       <div class="song-list-header">
@@ -214,86 +295,6 @@
       </div>
     </div>
 
-    <!-- Preview Modal -->
-    <div v-if="showPreview && song" class="preview-modal" @click.self="closePreview">
-      <div class="preview-content">
-        <div class="preview-header">
-          <div class="preview-title">
-            <h2>{{ song.title }}</h2>
-            <div class="preview-meta">
-              <span>BPM: {{ song.bpm }}</span>
-              <span>Time: {{ song.timeSignature }}</span>
-            </div>
-          </div>
-          <button class="btn-close" @click="closePreview" title="Close Preview">
-            ✕
-          </button>
-        </div>
-
-        <!-- Song Strip (Sticky) -->
-        <div class="preview-song-strip" v-if="song">
-          <div 
-            v-for="(section, sectionIndex) in song.sections" 
-            :key="sectionIndex" 
-            class="preview-strip-segment"
-            :class="{ 'preview-strip-segment-active': currentPreviewSectionIndex === sectionIndex }"
-            :style="{ flex: section.bars }"
-            @click="scrollToPreviewSection(sectionIndex)"
-          >
-            <div class="preview-strip-section-header">
-              <span class="preview-strip-name">{{ section.name }}</span>
-              <span class="preview-strip-bars">{{ section.bars }} bars</span>
-            </div>
-            <div class="preview-strip-bars-container">
-              <template v-for="bar in Array.from({ length: section.bars }, (_, i) => i + 1)" :key="bar">
-                <div 
-                  v-if="bar > 1 && (bar - 1) % barsPerPhrase === 0"
-                  class="preview-strip-phase-marker"
-                  :title="`Phase marker at bar ${bar}`"
-                ></div>
-                <div 
-                  class="preview-strip-bar-segment"
-                  :class="getBarPatternClass(section, bar)"
-                  :style="{ flex: 1 }"
-                  :title="`Bar ${bar}: ${getBarPatternLabel(section, bar)}`"
-                ></div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- Preview Sections Container -->
-        <div class="preview-sections-container">
-          <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card" :class="{ 'preview-section-card-active': currentPreviewSectionIndex === index }" :id="'preview-section-' + index">
-            <div class="preview-instruments-grid">
-              <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
-                <div class="preview-instrument-header">
-                  <h3 class="preview-section-name" v-if="inst === visibleInstruments[0]">{{ section.name }}</h3>
-                  <div class="preview-section-meta" v-if="inst === visibleInstruments[0]">
-                    <span>{{ section.bars }} bars</span>
-                    <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
-                  </div>
-                  <div class="preview-instrument-name" v-if="visibleInstruments.length > 1">{{ inst }}</div>
-                </div>
-                <div class="preview-pattern-map">
-                  <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
-                    <div v-for="bar in row" :key="bar" class="preview-bar-container">
-                      <div class="preview-bar-beats">
-                        <div v-for="beat in beatsPerBar" :key="beat" class="preview-beat-block"
-                          :class="getPatternClass(section, inst, bar, beat)"
-                          :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`">
-                          <span class="preview-pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -2042,18 +2043,19 @@ watch(() => song.value, (newSong, oldSong) => {
   background: #f8f9ff;
 }
 
-/* Preview Modal */
-.preview-modal {
+/* Preview View (Full Screen) */
+.preview-view {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  background: #f0f2f5;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  z-index: 9999;
   overflow: hidden;
 }
 
@@ -2219,6 +2221,7 @@ watch(() => song.value, (newSong, oldSong) => {
 .preview-sections-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px;
   scroll-behavior: smooth;
 }
