@@ -69,6 +69,14 @@
       >
         📜 Performance View
       </button>
+      <button 
+        v-if="isAdmin"
+        class="tab-btn" 
+        :class="{ active: activeTab === 'admin' }"
+        @click="setActiveTab('admin')"
+      >
+        👤 Admin
+      </button>
     </nav>
 
     <main>
@@ -99,6 +107,10 @@
       <SongPerformanceView
         v-if="activeTab === 'performance' && isAuthenticated"
       />
+
+      <AdminView
+        v-if="activeTab === 'admin' && isAuthenticated && isAdmin"
+      />
     </main>
   </div>
 </template>
@@ -107,16 +119,19 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
+import { useAdmin } from './composables/useAdmin'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
 import MusicAnalyzer from './components/MusicAnalyzer.vue'
 import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
+import AdminView from './components/AdminView.vue'
 import LoginView from './components/LoginView.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
+const { isAdmin, initializeUserRole } = useAdmin()
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
@@ -129,7 +144,8 @@ const routeToTab = {
   'slowdowner': 'slowdowner',
   'analyzer': 'analyzer',
   'performance': 'performance',
-  'multitrack': 'multitrack'
+  'multitrack': 'multitrack',
+  'admin': 'admin'
 }
 
 // Sync activeTab with route
@@ -149,6 +165,8 @@ const setActiveTab = (tab) => {
     router.push('/performance')
   } else if (tab === 'multitrack') {
     router.push('/multitrack')
+  } else if (tab === 'admin') {
+    router.push('/admin')
   }
 }
 
@@ -163,10 +181,33 @@ watch([isAuthenticated, activeTab], ([authenticated, tab]) => {
   }
 })
 
+// Handle route protection on mount and on route change
+watch(() => route.meta, (meta) => {
+  if (meta?.requiresAuth && !isAuthenticated.value) {
+    router.push('/slowdowner')
+  } else if (meta?.requiresAdmin && (!isAuthenticated.value || !isAdmin.value)) {
+    router.push('/slowdowner')
+  }
+}, { immediate: true })
+
+// Initialize user role when authenticated
+watch(isAuthenticated, async (authenticated) => {
+  if (authenticated && user.value) {
+    await initializeUserRole()
+  }
+}, { immediate: true })
+
 // Handle route protection on mount
-onMounted(() => {
+onMounted(async () => {
   if (route.meta?.requiresAuth && !isAuthenticated.value) {
     router.push('/slowdowner')
+  } else if (route.meta?.requiresAdmin && (!isAuthenticated.value || !isAdmin.value)) {
+    router.push('/slowdowner')
+  }
+  
+  // Initialize user role if authenticated
+  if (isAuthenticated.value && user.value) {
+    await initializeUserRole()
   }
 })
 

@@ -5,15 +5,51 @@ import {
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth'
-import { auth } from '../firebase/config'
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase/config'
 
 // Shared state
 const user = ref(null)
 const loading = ref(true)
 
 // Initialize auth state listener
-onAuthStateChanged(auth, (firebaseUser) => {
+onAuthStateChanged(auth, async (firebaseUser) => {
   user.value = firebaseUser
+  
+  // Update user document in Firestore if it exists (sync email/displayName)
+  if (firebaseUser) {
+    try {
+      const userDocRef = doc(db, 'users', firebaseUser.uid)
+      const userDoc = await getDoc(userDocRef)
+      
+      if (userDoc.exists()) {
+        // Update email/displayName if they've changed
+        const currentData = userDoc.data()
+        const updates = {}
+        if (currentData.email !== firebaseUser.email) {
+          updates.email = firebaseUser.email
+        }
+        if (currentData.displayName !== firebaseUser.displayName) {
+          updates.displayName = firebaseUser.displayName || null
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          await updateDoc(userDocRef, updates)
+        }
+      } else {
+        // Create user document if it doesn't exist
+        await setDoc(userDocRef, {
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || null,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        })
+      }
+    } catch (error) {
+      console.error('Error syncing user data:', error)
+    }
+  }
+  
   loading.value = false
 })
 
@@ -56,6 +92,20 @@ export function useAuth() {
       loading.value = true
       const result = await createUserWithEmailAndPassword(auth, email, password)
       user.value = result.user
+      
+      // Create user document in Firestore with default role
+      const userDocRef = doc(db, 'users', result.user.uid)
+      const userDoc = await getDoc(userDocRef)
+      
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+          email: result.user.email,
+          displayName: result.user.displayName || null,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        })
+      }
+      
       return { success: true, user: result.user }
     } catch (error) {
       console.error('Error signing up:', error)
