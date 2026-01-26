@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { collection, query, getDocs, doc, updateDoc, getDoc, setDoc, where } from 'firebase/firestore'
+import { collection, query, getDocs, doc, updateDoc, getDoc, setDoc, deleteDoc, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from './useAuth'
 
@@ -108,6 +108,28 @@ export const fetchUsers = async () => {
   }
 }
 
+// Delete user from Firestore
+export const deleteUser = async (userId) => {
+  try {
+    const userDocRef = doc(db, 'users', userId)
+    await deleteDoc(userDocRef)
+    
+    // Remove from cache
+    delete userRolesCache.value[userId]
+    
+    // Remove from users list
+    const userIndex = usersList.value.findIndex(u => u.uid === userId)
+    if (userIndex !== -1) {
+      usersList.value.splice(userIndex, 1)
+    }
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 // Initialize current user's role
 export const initializeUserRole = async () => {
   if (user.value) {
@@ -120,6 +142,7 @@ export function useAdmin() {
     isAdmin,
     getUserRole,
     updateUserRole,
+    deleteUser,
     fetchUsers,
     usersList,
     loadingUsers,

@@ -24,6 +24,7 @@
               <th>Display Name</th>
               <th>Role</th>
               <th>Actions</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -49,7 +50,7 @@
                   v-if="editingUserId !== user.uid"
                   @click="startEdit(user.uid, user.role || 'user')"
                   class="btn-edit"
-                  :disabled="savingUserId === user.uid"
+                  :disabled="savingUserId === user.uid || deletingUserId === user.uid"
                 >
                   ✏️ Edit
                 </button>
@@ -61,9 +62,19 @@
                   Cancel
                 </button>
               </td>
+              <td>
+                <button 
+                  @click="confirmDelete(user.uid, user.email)"
+                  class="btn-delete"
+                  :disabled="editingUserId === user.uid || savingUserId === user.uid || deletingUserId === user.uid"
+                  title="Delete user"
+                >
+                  🗑️
+                </button>
+              </td>
             </tr>
             <tr v-if="users.length === 0">
-              <td colspan="4" class="empty-state">
+              <td colspan="5" class="empty-state">
                 No users found. Users will appear here once they sign up.
               </td>
             </tr>
@@ -84,13 +95,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAdmin } from '../composables/useAdmin'
 
-const { fetchUsers, usersList, loadingUsers, updateUserRole } = useAdmin()
+const { fetchUsers, usersList, loadingUsers, updateUserRole, deleteUser } = useAdmin()
 
 const loading = ref(false)
 const error = ref(null)
 const editingUserId = ref(null)
 const editingRole = ref('user')
 const savingUserId = ref(null)
+const deletingUserId = ref(null)
 
 const users = computed(() => usersList.value)
 
@@ -125,6 +137,25 @@ const saveUserRole = async (userId) => {
     error.value = result.error || 'Failed to update user role'
   }
   savingUserId.value = null
+}
+
+const confirmDelete = (userId, userEmail) => {
+  if (window.confirm(`Are you sure you want to delete user "${userEmail || userId}"?\n\nThis will remove the user from the database. This action cannot be undone.`)) {
+    handleDelete(userId)
+  }
+}
+
+const handleDelete = async (userId) => {
+  deletingUserId.value = userId
+  error.value = null
+  
+  const result = await deleteUser(userId)
+  
+  if (!result.success) {
+    error.value = result.error || 'Failed to delete user'
+  }
+  
+  deletingUserId.value = null
 }
 
 onMounted(() => {
@@ -307,6 +338,26 @@ onMounted(() => {
 
 .btn-cancel:hover {
   background: #4a5568;
+}
+
+.btn-delete {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #c53030;
+}
+
+.btn-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .admin-actions {
