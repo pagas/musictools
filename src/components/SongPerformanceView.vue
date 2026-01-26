@@ -64,7 +64,7 @@
               <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
                 <div v-for="bar in row" :key="bar" class="preview-bar-container">
                   <div class="preview-bar-beats">
-                    <div v-for="beat in beatsPerBar" :key="beat" class="preview-beat-block"
+                    <div v-for="beat in getVisibleBeats(section, bar)" :key="beat" class="preview-beat-block"
                       :class="getPatternClass(section, inst, bar, beat)"
                       :title="`Bar ${bar}, Beat ${beat}: ${getPatternIcon(section, inst, bar, beat)}`">
                       <span class="preview-pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
@@ -295,6 +295,13 @@
                           <div class="bar-menu-divider"></div>
                           <button 
                             class="bar-menu-item bar-menu-item-danger" 
+                            @click.stop="deleteLastBeat(section, inst, bar)"
+                          >
+                            <span class="menu-icon">✂️</span> Delete Last Beat
+                          </button>
+                          <div class="bar-menu-divider"></div>
+                          <button 
+                            class="bar-menu-item bar-menu-item-danger" 
                             @click="deleteBar(section, bar)"
                           >
                             <span class="menu-icon">🗑️</span> Delete Bar
@@ -303,7 +310,7 @@
                       </div>
                     </div>
                     <div class="bar-beats">
-                      <div v-for="beat in beatsPerBar" :key="beat" class="beat-block"
+                      <div v-for="beat in getVisibleBeats(section, bar)" :key="beat" class="beat-block"
                         :class="getPatternClass(section, inst, bar, beat)"
                         @click="togglePattern(section, inst, bar, beat)" :title="`Bar ${bar}, Beat ${beat}`">
                         <span class="pattern-icon">{{ getPatternIcon(section, inst, bar, beat) }}</span>
@@ -737,7 +744,14 @@ const toggleBarMenu = (section, instrument, bar) => {
 }
 
 // Close bar menu when clicking outside
-const closeBarMenu = () => {
+const closeBarMenu = (event) => {
+  // Don't close if clicking inside the menu
+  if (event && event.target) {
+    const target = event.target
+    if (target.closest('.bar-menu-dropdown')) {
+      return
+    }
+  }
   openBarMenu.value = null
 }
 
@@ -763,10 +777,10 @@ const setBarPattern = (section, instrument, bar, pattern) => {
 }
 
 // Delete a bar from a section
-const deleteBar = (section, bar) => {
+const deleteBar = (section, bar, skipConfirm = false) => {
   if (!song.value || section.bars <= 1) return
   
-  if (!window.confirm(`Are you sure you want to delete bar ${bar}? This will remove the bar and shift all subsequent bars.`)) {
+  if (!skipConfirm && !window.confirm(`Are you sure you want to delete bar ${bar}? This will remove the bar and shift all subsequent bars.`)) {
     openBarMenu.value = null
     return
   }
@@ -796,6 +810,19 @@ const deleteBar = (section, bar) => {
     }
   }
   
+  // Remove deletedBeats entry for this bar
+  if (section.deletedBeats && section.deletedBeats[bar]) {
+    delete section.deletedBeats[bar]
+  }
+  
+  // Renumber deletedBeats entries for subsequent bars
+  for (let b = bar + 1; b <= section.bars; b++) {
+    if (section.deletedBeats && section.deletedBeats[b]) {
+      section.deletedBeats[b - 1] = section.deletedBeats[b]
+      delete section.deletedBeats[b]
+    }
+  }
+  
   // Decrease bar count
   section.bars--
   
@@ -817,6 +844,58 @@ const togglePattern = (section, instrument, bar, beat) => {
   }[current]
 
   section.patterns[instrument][patternKey] = next
+}
+
+// Get visible beats for a bar (excluding deleted beats)
+const getVisibleBeats = (section, bar) => {
+  if (!section.deletedBeats) {
+    section.deletedBeats = {}
+  }
+  const deletedBeats = section.deletedBeats[bar] || []
+  return Array.from({ length: beatsPerBar.value }, (_, i) => i + 1).filter(beat => !deletedBeats.includes(beat))
+}
+
+// Delete the last beat from a bar (completely removes it)
+const deleteLastBeat = (section, instrument, bar) => {
+  if (!song.value) return
+  
+  // Initialize deletedBeats if it doesn't exist
+  if (!section.deletedBeats) {
+    section.deletedBeats = {}
+  }
+  if (!section.deletedBeats[bar]) {
+    section.deletedBeats[bar] = []
+  }
+  
+  // Get the last visible beat (or last beat if none deleted)
+  const visibleBeats = getVisibleBeats(section, bar)
+  const lastBeat = visibleBeats.length > 0 ? visibleBeats[visibleBeats.length - 1] : beatsPerBar.value
+  
+  // Mark this beat as deleted
+  if (!section.deletedBeats[bar].includes(lastBeat)) {
+    section.deletedBeats[bar].push(lastBeat)
+  }
+  
+  // Also remove pattern data for all instruments
+  if (section.patterns) {
+    for (const inst in section.patterns) {
+      if (section.patterns[inst]) {
+        const patternKey = `${bar}-${lastBeat}`
+        delete section.patterns[inst][patternKey]
+      }
+    }
+  }
+  
+  // Check if all beats are now deleted - if so, remove the entire bar
+  const remainingVisibleBeats = getVisibleBeats(section, bar)
+  if (remainingVisibleBeats.length === 0) {
+    // All beats deleted, remove the bar completely (skip confirmation since user already confirmed beat deletion)
+    deleteBar(section, bar, true)
+    return // deleteBar will close the menu, so we can return early
+  }
+  
+  // Close menu
+  openBarMenu.value = null
 }
 
 const scrollToSection = (index) => {
@@ -1939,7 +2018,7 @@ watch(() => song.value, (newSong, oldSong) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 160px;
   z-index: 1000;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bar-menu-item {
@@ -1981,6 +2060,47 @@ watch(() => song.value, (newSong, oldSong) => {
   width: 16px;
   text-align: center;
 }
+
+.bar-menu-item-with-submenu {
+  position: relative;
+}
+
+.bar-menu-item-with-submenu > .bar-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.submenu-arrow {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-left: auto;
+}
+
+.bar-menu-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 4px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 120px;
+  z-index: 1002;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .bar-menu-submenu {
+    left: auto;
+    right: 100%;
+    margin-left: 0;
+    margin-right: 4px;
+  }
+}
+
 
 .bar-label {
   font-size: 0.7rem;
