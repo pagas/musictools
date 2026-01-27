@@ -5,8 +5,8 @@ const getValue = (valueOrGetter) => {
   return typeof valueOrGetter === 'function' ? valueOrGetter() : valueOrGetter?.value
 }
 
-// ChordsDetection default window size in seconds (Essentia)
-const CHORD_WINDOW_SECONDS = 2
+// TonalExtractor hopSize (samples) – one chord estimate per hop
+const TONAL_HOP_SIZE = 2048
 
 // Lazy-loaded Essentia instance (WASM + core)
 let essentiaInstance = null
@@ -24,32 +24,38 @@ async function getEssentia() {
   return essentiaInstance
 }
 
-// Convert VectorFloat / array-like to number array (for chords_strength)
+// Convert Emscripten VectorFloat/VectorString or array-like to JS array
 function toArray(value) {
   if (value == null) return []
   if (Array.isArray(value)) return value
-  if (typeof value?.size === 'number') {
+  const size = typeof value.size === 'function' ? value.size() : value.size
+  if (typeof size === 'number' && size >= 0) {
     const out = []
-    for (let i = 0; i < value.size(); i++) out.push(value.get(i))
+    const get = typeof value.get === 'function' ? (i) => value.get(i) : (i) => value[i]
+    for (let i = 0; i < size; i++) out.push(get(i))
     return out
   }
-  return Array.from(value)
+  try {
+    return Array.from(value)
+  } catch {
+    return []
+  }
 }
 
 // Convert chord progression + strength to our format and merge consecutive identical chords
-function buildChordSegments(progression, strength, windowSeconds = CHORD_WINDOW_SECONDS) {
+function buildChordSegments(progression, strength, secondsPerChord) {
   const names = toArray(progression)
   const strengths = toArray(strength)
-  if (!names.length) return []
+  if (!names.length || !(secondsPerChord > 0)) return []
 
   const windows = names.map((name, i) => ({
     chord: {
-      fullName: String(name || 'N'),
+      fullName: String(name ?? 'N').trim() || 'N',
       confidence: Math.min(100, Math.round((strengths[i] ?? 0) * 100))
     },
-    startTime: i * windowSeconds,
-    endTime: (i + 1) * windowSeconds,
-    duration: windowSeconds
+    startTime: i * secondsPerChord,
+    endTime: (i + 1) * secondsPerChord,
+    duration: secondsPerChord
   }))
 
   const merged = []
@@ -66,7 +72,7 @@ function buildChordSegments(progression, strength, windowSeconds = CHORD_WINDOW_
   }
   if (cur) merged.push(cur)
 
-  return merged.filter((g) => g.duration >= 0.5).sort((a, b) => a.startTime - b.startTime)
+  return merged.filter((g) => g.duration >= 0.2).sort((a, b) => a.startTime - b.startTime)
 }
 
 export function useChordDetection(audioFile) {
@@ -132,11 +138,18 @@ export function useChordDetection(audioFile) {
         console.log('Detected key:', detectedKey.value)
       }
 
-      // Chords (and key/strength) via TonalExtractor
-      const tonal = Essentia.TonalExtractor(signalVector, 4096, 2048, 440)
-      const chordsProgression = tonal?.chords_progression
-      const chordsStrength = tonal?.chords_strength
-      detectedChords.value = buildChordSegments(chordsProgression, chordsStrength, CHORD_WINDOW_SECONDS)
+      // Chords (and key/strength) via TonalExtractor – one chord per hop (2048 samples)
+      const tonal = Essentia.TonalExtractor(signalVector, 4096, TONAL_HOP_SIZE, 440)
+      const chordsProgression = tonal?.chords_progression ?? tonal?.chordsProgression
+      const chordsStrength = tonal?.chords_strength ?? tonal?.chordsStrength
+      const secondsPerChord = TONAL_HOP_SIZE / sampleRate
+      const segments = buildChordSegments(chordsProgression, chordsStrength, secondsPerChord)
+      detectedChords.value = segments
+      if (segments.length > 0) {
+        console.log('Chords:', segments.length, 'segments, first:', segments[0].chord.fullName, '@', segments[0].startTime.toFixed(1) + 's')
+      } else if (chordsProgression != null || chordsStrength != null) {
+        console.warn('TonalExtractor returned chord data but buildChordSegments produced none. progression length:', toArray(chordsProgression).length, 'strength length:', toArray(chordsStrength).length)
+      }
 
       // Prefer key from TonalExtractor if we didn’t get it from KeyExtractor
       if (!detectedKey.value && tonal?.key_key) {
