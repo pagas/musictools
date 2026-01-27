@@ -17,9 +17,10 @@ function generateShareId() {
 /**
  * Create a public share for a song. Requires auth.
  * @param {Object} song - Song object (id, title, bpm, timeSignature, sections, instruments, etc.)
+ * @param {string|null} selectedInstrument - Instrument filter to apply in the public preview (current UI selection)
  * @returns {Promise<{ success: boolean, shareId?: string, error?: string }>}
  */
-export async function createShare(song) {
+export async function createShare(song, selectedInstrument = null) {
   const { user } = useAuth()
   if (!user?.value) {
     return { success: false, error: 'Must be signed in to share' }
@@ -32,8 +33,13 @@ export async function createShare(song) {
     // Store only the fields needed for preview (no userId, no server timestamps)
     const { id, userId, createdAt, updatedAt, ...rest } = song
     const shareId = generateShareId()
+    const metadata = { ...(rest.metadata || {}) }
+    if (selectedInstrument != null && selectedInstrument !== '') {
+      metadata.selectedInstrument = selectedInstrument
+    }
     const payload = {
       ...rest,
+      metadata,
       sharedBy: user.value.uid,
       sharedAt: new Date().toISOString()
     }

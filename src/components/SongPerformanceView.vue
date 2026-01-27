@@ -396,7 +396,14 @@ const previewSong = computed(() => {
 })
 const previewVisibleInstruments = computed(() => {
   if (!previewSong.value) return []
-  if (props.publicPreview) return previewSong.value.instruments || ['Drums', 'Bass', 'Guitar', 'Keys']
+  if (props.publicPreview) {
+    const instruments = previewSong.value.instruments || ['Drums', 'Bass', 'Guitar', 'Keys']
+    const sharedInstrument = previewSong.value.metadata?.selectedInstrument
+    if (sharedInstrument && instruments.includes(sharedInstrument)) {
+      return [sharedInstrument]
+    }
+    return instruments
+  }
   return visibleInstruments.value
 })
 
@@ -410,7 +417,8 @@ const copyShareLink = async () => {
   shareLoading.value = true
   shareLinkCopied.value = false
   try {
-    const { success, shareId, error } = await createShare(song.value)
+    const selectedInstrumentToShare = selectedInstrument.value ?? song.value.metadata?.selectedInstrument
+    const { success, shareId, error } = await createShare(song.value, selectedInstrumentToShare)
     if (!success || !shareId) {
       alert(error || 'Could not create share link')
       return
@@ -659,10 +667,12 @@ const barsPerRow = computed(() => {
 })
 
 // Get bars per phrase from time signature (use numerator - typically 4 bars per phrase in 4/4)
+// In preview mode use previewSong so strip phase markers match the shared song
 const barsPerPhrase = computed(() => {
-  if (!song.value) return 4
-  const [beats] = song.value.timeSignature.split('/').map(Number)
-  return beats || 4 // Default to 4 if parsing fails
+  const s = isShowingPreview.value ? previewSong.value : song.value
+  if (!s) return 4
+  const [beats] = (s.timeSignature || '4/4').split('/').map(Number)
+  return beats || 4
 })
 
 // Group bars into rows based on time signature
@@ -752,26 +762,24 @@ const getPatternIcon = (section, instrument, bar, beat) => {
   }
 }
 
-// Get the overall pattern for a bar across all visible instruments
+// Get the overall pattern for a bar across visible instruments (preview uses previewVisibleInstruments)
 const getBarPattern = (section, bar) => {
-  if (!section.patterns || visibleInstruments.value.length === 0) return 'play'
-  
-  const beats = beatsPerBar.value
+  const instrumentsToUse = isShowingPreview.value ? previewVisibleInstruments.value : visibleInstruments.value
+  if (!section.patterns || instrumentsToUse.length === 0) return 'play'
+
+  const beats = (isShowingPreview.value && previewSong.value)
+    ? (() => { const [b] = (previewSong.value.timeSignature || '4/4').split('/').map(Number); return b || 4 })()
+    : beatsPerBar.value
   const patterns = []
-  
-  // Check all beats for all visible instruments
-  for (const inst of visibleInstruments.value) {
+
+  for (const inst of instrumentsToUse) {
     for (let beat = 1; beat <= beats; beat++) {
       const patternKey = `${bar}-${beat}`
       const pattern = section.patterns[inst]?.[patternKey] || 'play'
       patterns.push(pattern)
     }
   }
-  
-  // Determine overall pattern:
-  // - If all are 'rest' -> 'rest'
-  // - If any are 'fill' -> 'fill'
-  // - Otherwise -> 'play'
+
   if (patterns.every(p => p === 'rest')) return 'rest'
   if (patterns.some(p => p === 'fill')) return 'fill'
   return 'play'
