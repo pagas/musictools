@@ -8,6 +8,7 @@ export function useAudio(file) {
   const volume = ref(100)
   const currentSpeed = ref(1)
   const currentPitch = ref(0) // Pitch in semitones
+  const isLoop = ref(false)
 
   const audioUrl = computed(() => {
     return file.value ? URL.createObjectURL(file.value) : ''
@@ -48,6 +49,13 @@ export function useAudio(file) {
     }
   }
 
+  const toggleLoop = () => {
+    isLoop.value = !isLoop.value
+    if (audioPlayer.value) {
+      audioPlayer.value.loop = isLoop.value
+    }
+  }
+
   const handleLoadedMetadata = () => {
     if (audioPlayer.value) {
       duration.value = audioPlayer.value.duration
@@ -67,6 +75,11 @@ export function useAudio(file) {
   const handlePause = () => {
     isPlaying.value = false
   }
+
+  // Sync loop to audio element when player is set
+  watch(() => audioPlayer.value, (el) => {
+    if (el) el.loop = isLoop.value
+  }, { immediate: true })
 
   // Reset when file changes
   watch(() => file.value, () => {
@@ -89,8 +102,10 @@ export function useAudio(file) {
     volume,
     currentSpeed,
     currentPitch,
+    isLoop,
     audioUrl,
     togglePlayPause,
+    toggleLoop,
     setPlaybackSpeed,
     setPitch,
     updateVolume,

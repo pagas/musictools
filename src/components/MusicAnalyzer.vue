@@ -13,12 +13,27 @@
     <div class="analyzer-controls">
       <div class="playback-section">
         <div class="volume-play-wrapper">
+          <button class="play-btn seek-btn" title="Jump to beginning" @click="seek(0)">
+            <svg class="seek-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+            </svg>
+          </button>
           <button class="play-btn" @click="togglePlayPause">
             <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
             </svg>
             <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          </button>
+          <button
+            class="play-btn seek-btn"
+            :class="{ 'seek-btn--active': isLoop }"
+            title="Repeat"
+            @click="toggleLoop"
+          >
+            <svg class="repeat-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
             </svg>
           </button>
           <VolumeControl
@@ -76,8 +91,10 @@ const {
   currentTime,
   duration,
   volume,
+  isLoop,
   audioUrl,
   togglePlayPause: togglePlayPauseBase,
+  toggleLoop,
   updateVolume,
   seek,
   handleLoadedMetadata: handleLoadedMetadataBase,
@@ -231,6 +248,13 @@ onMounted(() => {
   color: white;
 }
 
+.seek-btn .seek-icon,
+.seek-btn .repeat-icon {
+  width: 22px;
+  height: 22px;
+  color: white;
+}
+
 .seek-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
@@ -264,6 +288,15 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   color: white;
+}
+
+/* Repeat active state – must come after .seek-btn to override */
+.seek-btn.seek-btn--active {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  box-shadow: 0 0 0 2px white, 0 3px 10px rgba(81, 207, 102, 0.5);
+}
+.seek-btn.seek-btn--active:hover {
+  box-shadow: 0 0 0 2px white, 0 5px 15px rgba(81, 207, 102, 0.6);
 }
 
 .seek-start-btn {
