@@ -15,7 +15,9 @@
       </button>
       </div>
 
-      <!-- Song Strip (Sticky) -->
+      <!-- Preview body: strip + sections (row on mobile) -->
+      <div class="preview-body">
+      <!-- Song Strip (horizontal on desktop, vertical on mobile) -->
       <div class="preview-song-strip" v-if="song">
       <div 
         v-for="(section, sectionIndex) in song.sections" 
@@ -29,7 +31,7 @@
           <span class="preview-strip-name">{{ section.name }}</span>
           <span class="preview-strip-bars">{{ section.bars }} bars</span>
         </div>
-        <div class="preview-strip-bars-container">
+        <div class="preview-strip-bars-container" :class="{ 'preview-strip-bars-vertical': section.bars > 2 }">
           <template v-for="bar in Array.from({ length: section.bars }, (_, i) => i + 1)" :key="bar">
             <div 
               v-if="bar > 1 && (bar - 1) % barsPerPhrase === 0"
@@ -78,6 +80,7 @@
       </div>
       </div>
     </div>
+  </div>
   </Teleport>
 
   <div v-if="!showPreview || !song" class="performance-view">
@@ -2249,6 +2252,14 @@ watch(() => song.value, (newSong, oldSong) => {
   color: #333;
 }
 
+.preview-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .preview-song-strip {
   position: sticky;
   top: 0;
@@ -2285,6 +2296,11 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .preview-section-card-active {
   border-left: 4px solid #667eea;
+}
+
+.preview-strip-segment-active {
+  border-left: 4px solid #667eea;
+  background: #9ca3af;
 }
 
 .preview-strip-section-header {
@@ -2798,6 +2814,83 @@ watch(() => song.value, (newSong, oldSong) => {
     font-size: 0.9rem;
     border-radius: 10px;
   }
+
+  /* Preview: vertical strip + sections in one row on mobile */
+  .preview-body {
+    flex-direction: row;
+    min-width: 0;
+  }
+
+  .preview-song-strip {
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    min-height: 0;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 4px;
+    position: relative;
+    top: 0;
+  }
+
+  .preview-strip-segment {
+    flex: none;
+    min-height: 52px;
+    min-width: 0;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 4px 0;
+  }
+
+  .preview-strip-segment:last-child {
+    border-bottom: none;
+  }
+
+  .preview-strip-section-header {
+    margin-bottom: 4px;
+  }
+
+  .preview-strip-name {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    text-align: center;
+    display: block;
+  }
+
+  .preview-strip-bars {
+    font-size: 0.55rem;
+  }
+
+  .preview-strip-bars-container {
+    min-height: 20px;
+    flex-direction: row;
+  }
+
+  .preview-strip-bars-container.preview-strip-bars-vertical {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    min-height: 0;
+  }
+
+  .preview-strip-bars-container.preview-strip-bars-vertical .preview-strip-bar-segment {
+    flex: 1 1 auto;
+    min-height: 4px;
+  }
+
+  .preview-strip-bars-container.preview-strip-bars-vertical .preview-strip-phase-marker {
+    width: 100%;
+    height: 1px;
+  }
+
+  .preview-sections-container {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 600px) {
@@ -2958,6 +3051,24 @@ watch(() => song.value, (newSong, oldSong) => {
 
   .preview-title h2 {
     font-size: 1.1rem;
+  }
+
+  .preview-song-strip {
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+  }
+
+  .preview-strip-segment {
+    min-height: 48px;
+  }
+
+  .preview-strip-name {
+    font-size: 0.55rem;
+  }
+
+  .preview-strip-bars {
+    font-size: 0.5rem;
   }
 
   .preview-sections-container {
