@@ -28,7 +28,7 @@
       </div>
       <div v-if="detectedChords.length > 0" class="chords-section">
         <h5 class="chords-title">Detected Chords</h5>
-        <div class="chords-list">
+        <div ref="chordsListRef" class="chords-list">
       <div
         v-for="(chordGroup, index) in detectedChords"
         :key="index"
@@ -50,7 +50,10 @@
 </template>
 
 <script setup>
+import { ref, computed, watch, nextTick } from 'vue'
 import { useChordDetection } from '../composables/useChordDetection'
+
+const chordsListRef = ref(null)
 
 const props = defineProps({
   file: {
@@ -95,6 +98,23 @@ const isChordPlaying = (chordGroup) => {
   const t = props.currentTime
   return t >= chordGroup.startTime && t < chordGroup.endTime
 }
+
+const playingChordIndex = computed(() => {
+  const t = props.currentTime
+  const idx = detectedChords.value.findIndex(
+    (c) => t >= c.startTime && t < c.endTime
+  )
+  return idx >= 0 ? idx : null
+})
+
+watch(playingChordIndex, (newIdx, oldIdx) => {
+  if (newIdx != null && newIdx !== oldIdx) {
+    nextTick(() => {
+      const el = chordsListRef.value?.querySelector('.chord-item--playing')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+})
 </script>
 
 <style scoped>
