@@ -5,6 +5,9 @@
     <p>Loading...</p>
   </div>
 
+  <!-- Public preview: /p/:shareId – no auth, full-screen preview -->
+  <PublicPreviewPage v-else-if="route.name === 'publicPreview'" />
+
   <!-- Show login if not authenticated and trying to access protected tabs, or if showLoginView is true -->
   <LoginView v-else-if="(!isAuthenticated && activeTab !== 'slowdowner' && activeTab !== 'analyzer') || showLoginView" @open-tab="setActiveTab($event); showLoginView = false" />
 
@@ -127,6 +130,7 @@ import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
 import AdminView from './components/AdminView.vue'
 import LoginView from './components/LoginView.vue'
+import PublicPreviewPage from './components/PublicPreviewPage.vue'
 
 const router = useRouter()
 const route = useRoute()

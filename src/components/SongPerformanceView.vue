@@ -1,26 +1,28 @@
 <template>
   <!-- Preview View (Full Screen) - Teleported to body -->
   <Teleport to="body">
-    <div v-if="showPreview && song" class="preview-view">
+    <div v-if="isShowingPreview" class="preview-view">
     <div class="preview-header">
       <div class="preview-title">
-        <h2>{{ song.title }}</h2>
+        <h2>{{ previewSong.title }}</h2>
         <div class="preview-meta">
-          <span>BPM: {{ song.bpm }}</span>
-          <span>Time: {{ song.timeSignature }}</span>
+          <span>BPM: {{ previewSong.bpm }}</span>
+          <span>Time: {{ previewSong.timeSignature }}</span>
         </div>
       </div>
-      <button class="btn-close" @click="closePreview" title="Close Preview">
-        ✕
-      </button>
+      <div class="preview-header-actions">
+        <button class="btn-close" @click="publicPreview ? goToHome() : closePreview()" :title="publicPreview ? 'Close' : 'Close Preview'">
+          ✕
+        </button>
+      </div>
       </div>
 
       <!-- Preview body: strip + sections (row on mobile) -->
       <div class="preview-body">
       <!-- Song Strip (horizontal on desktop, vertical on mobile) -->
-      <div class="preview-song-strip" v-if="song">
+      <div class="preview-song-strip" v-if="previewSong">
       <div 
-        v-for="(section, sectionIndex) in song.sections" 
+        v-for="(section, sectionIndex) in previewSong.sections" 
         :key="sectionIndex" 
         class="preview-strip-segment"
         :style="{ flex: section.bars }"
@@ -50,16 +52,16 @@
 
     <!-- Preview Sections Container -->
     <div class="preview-sections-container">
-      <div v-for="(section, index) in song.sections" :key="index" class="preview-section-card" :class="{ 'preview-section-card-active': currentPreviewSectionIndex === index }" :id="'preview-section-' + index">
+      <div v-for="(section, index) in previewSong.sections" :key="index" class="preview-section-card" :class="{ 'preview-section-card-active': currentPreviewSectionIndex === index }" :id="'preview-section-' + index">
         <div class="preview-instruments-grid">
-          <div v-for="inst in visibleInstruments" :key="inst" class="preview-instrument-row">
+          <div v-for="inst in previewVisibleInstruments" :key="inst" class="preview-instrument-row">
             <div class="preview-instrument-header">
-              <h3 class="preview-section-name" v-if="inst === visibleInstruments[0]">{{ section.name }}</h3>
-              <div class="preview-section-meta" v-if="inst === visibleInstruments[0]">
+              <h3 class="preview-section-name" v-if="inst === previewVisibleInstruments[0]">{{ section.name }}</h3>
+              <div class="preview-section-meta" v-if="inst === previewVisibleInstruments[0]">
                 <span>{{ section.bars }} bars</span>
                 <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
               </div>
-              <div class="preview-instrument-name" v-if="visibleInstruments.length > 1">{{ inst }}</div>
+              <div class="preview-instrument-name" v-if="previewVisibleInstruments.length > 1">{{ inst }}</div>
             </div>
             <div class="preview-pattern-map">
               <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
@@ -82,7 +84,7 @@
   </div>
   </Teleport>
 
-  <div v-if="!showPreview || !song" class="performance-view">
+  <div v-if="!isShowingPreview" class="performance-view">
     <!-- Song List View -->
     <div v-if="showSongList" class="song-list-view">
       <div class="song-list-header">
@@ -129,9 +131,14 @@
       <!-- Header (not sticky) -->
       <div class="header-top">
         <div class="song-info">
-          <button class="btn-back" @click="goToSongList" title="Back to Songs">
-            ← Back
-          </button>
+          <div class="header-top-row">
+            <button class="btn-back" @click="goToSongList" title="Back to Songs">
+              ← Back
+            </button>
+            <button v-if="song" class="btn-share" @click="copyShareLink" :disabled="shareLoading" :title="shareLinkCopied ? 'Copied!' : 'Copy public preview link'">
+              {{ shareLinkCopied ? '✓ Copied!' : (shareLoading ? '…' : 'Share') }}
+            </button>
+          </div>
           <div v-if="song" class="header-content-row">
 
 
@@ -342,6 +349,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSongs } from '../composables/useSongs'
 import { useAuth } from '../composables/useAuth'
+import { createShare } from '../composables/useSharedSongs'
+
+const props = defineProps({
+  publicPreview: { type: Boolean, default: false },
+  sharedSong: { type: Object, default: null }
+})
 
 const router = useRouter()
 const route = useRoute()
@@ -372,6 +385,51 @@ let isUpdatingFromRoute = false
 
 // Computed property for showPreview from route
 const showPreview = computed(() => route.query.preview === 'true')
+
+// Public preview: show when in-app preview (showPreview + song) or public share (publicPreview + sharedSong)
+const isShowingPreview = computed(() =>
+  (props.publicPreview && props.sharedSong) || (showPreview.value && song.value)
+)
+const previewSong = computed(() => {
+  if (props.publicPreview && props.sharedSong) return props.sharedSong
+  return song.value
+})
+const previewVisibleInstruments = computed(() => {
+  if (!previewSong.value) return []
+  if (props.publicPreview) return previewSong.value.instruments || ['Drums', 'Bass', 'Guitar', 'Keys']
+  return visibleInstruments.value
+})
+
+// Share link state
+const shareLoading = ref(false)
+const shareLinkCopied = ref(false)
+let shareCopiedTimeout = null
+
+const copyShareLink = async () => {
+  if (!song.value || shareLoading.value) return
+  shareLoading.value = true
+  shareLinkCopied.value = false
+  try {
+    const { success, shareId, error } = await createShare(song.value)
+    if (!success || !shareId) {
+      alert(error || 'Could not create share link')
+      return
+    }
+    const url = `${window.location.origin}/p/${shareId}`
+    await navigator.clipboard.writeText(url)
+    shareLinkCopied.value = true
+    if (shareCopiedTimeout) clearTimeout(shareCopiedTimeout)
+    shareCopiedTimeout = setTimeout(() => { shareLinkCopied.value = false }, 3000)
+  } catch (e) {
+    alert('Failed to copy link')
+  } finally {
+    shareLoading.value = false
+  }
+}
+
+const goToHome = () => {
+  router.push('/')
+}
 
 // Bar menu state
 const openBarMenu = ref(null) // { section, instrument, bar } or null
@@ -968,7 +1026,7 @@ watch(() => song.value?.sections?.length, async () => {
   if (!song.value) return
   await nextTick()
   setupObserver()
-  if (showPreview) {
+  if (isShowingPreview.value) {
     setupPreviewObserver()
   }
 })
@@ -993,6 +1051,18 @@ watch(() => selectedSongId.value, async () => {
 // Watch for preview mode to set up preview observer
 watch(() => showPreview, async (isPreview) => {
   if (isPreview) {
+    await nextTick()
+    setupPreviewObserver()
+  } else {
+    if (previewObserver) {
+      previewObserver.disconnect()
+      previewObserver = null
+    }
+  }
+})
+
+watch(() => isShowingPreview.value, async (showing) => {
+  if (showing) {
     await nextTick()
     setupPreviewObserver()
   } else {
@@ -1035,7 +1105,7 @@ const setupObserver = () => {
 
 // Helper function to set up the intersection observer for preview mode
 const setupPreviewObserver = () => {
-  if (!song.value || !showPreview.value) return
+  if (!previewSong.value || !isShowingPreview.value) return
 
   if (previewObserver) {
     previewObserver.disconnect()
@@ -1262,6 +1332,13 @@ watch(() => song.value, (newSong, oldSong) => {
 .song-info {
   flex: 1;
   min-width: 0;
+}
+
+.header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .header-content-row {
@@ -2231,6 +2308,33 @@ watch(() => song.value, (newSong, oldSong) => {
   color: #666;
 }
 
+.preview-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-share {
+  padding: 8px 14px;
+  border: 1px solid #667eea;
+  background: rgba(102, 126, 234, 0.08);
+  color: #667eea;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-share:hover:not(:disabled) {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+.btn-share:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .btn-close {
   width: 40px;
   height: 40px;
@@ -2524,9 +2628,14 @@ watch(() => song.value, (newSong, oldSong) => {
     width: 100%;
   }
 
+  .header-top-row {
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+
   .btn-back {
     margin-right: 0;
-    margin-bottom: 4px;
+    margin-bottom: 0;
     padding: 10px 12px;
     font-size: 0.875rem;
     font-weight: 600;
@@ -2898,6 +3007,17 @@ watch(() => song.value, (newSong, oldSong) => {
   .header-top {
     padding: 8px 12px;
     gap: 8px;
+  }
+
+  .header-top-row {
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+
+  .header-top-row .btn-share {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 0.8125rem;
   }
 
   .btn-back {

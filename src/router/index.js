@@ -7,6 +7,12 @@ const routes = [
     redirect: '/slowdowner'
   },
   {
+    path: '/p/:shareId',
+    name: 'publicPreview',
+    component: () => import('../components/PublicPreviewPage.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/slowdowner',
     name: 'slowdowner',
     component: { template: '<div></div>' }
