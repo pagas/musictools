@@ -23,7 +23,6 @@
         v-for="(section, sectionIndex) in song.sections" 
         :key="sectionIndex" 
         class="preview-strip-segment"
-        :class="{ 'preview-strip-segment-active': currentPreviewSectionIndex === sectionIndex }"
         :style="{ flex: section.bars }"
         @click="scrollToPreviewSection(sectionIndex)"
       >
@@ -2296,11 +2295,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .preview-section-card-active {
   border-left: 4px solid #667eea;
-}
-
-.preview-strip-segment-active {
-  border-left: 4px solid #667eea;
-  background: #9ca3af;
+  background: rgba(102, 126, 234, 0.06);
 }
 
 .preview-strip-section-header {
@@ -2397,6 +2392,7 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .preview-section-card-active {
   border-left: 4px solid #667eea;
+  background: rgba(102, 126, 234, 0.06);
 }
 
 .preview-instruments-grid {
