@@ -1257,6 +1257,11 @@ watch(() => song.value, (newSong, oldSong) => {
   gap: 16px;
 }
 
+.song-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .header-content-row {
   display: flex;
   align-items: flex-start;
@@ -2490,17 +2495,461 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 /* Mobile responsive */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .header-top {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .song-info {
+    width: 100%;
+  }
+
+  .btn-back {
+    margin-right: 0;
+    margin-bottom: 4px;
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    min-height: 44px;
+    border-radius: 8px;
+  }
+
+  .header-content-row {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .song-info-content {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .song-title-input {
+    font-size: 1.125rem;
+    font-weight: 600;
+    max-width: none;
+    padding: 8px 10px;
+    min-height: 44px;
+    border-radius: 8px;
+    margin: 0 0 4px 0;
+  }
+
+  .meta-info {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .bpm,
+  .time-sig {
+    padding: 6px 10px;
+    min-height: 40px;
+    font-size: 0.8125rem;
+    gap: 4px;
+    border-radius: 8px;
+  }
+
+  .header-top .label {
+    font-size: 0.65rem;
+    letter-spacing: 0.3px;
+  }
+
+  .meta-value-input {
+    width: 48px;
+    padding: 4px 6px;
+    font-size: 0.875rem;
+    min-height: 32px;
+    border-radius: 6px;
+  }
+
+  .instrument-filter {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .instrument-list {
+    gap: 5px;
+    row-gap: 6px;
+  }
+
+  .filter-btn {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    min-height: 40px;
+    border-radius: 8px;
+  }
+
+  .instrument-tag {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    min-height: 40px;
+    border-radius: 12px;
+  }
+
+  .instrument-remove {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 1.1rem;
+  }
+
+  .instrument-manager {
+    padding-top: 8px;
+    gap: 6px;
+  }
+
+  .instrument-dropdown-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .instrument-select {
+    min-width: 100%;
+    padding: 8px 10px;
+    font-size: 0.875rem;
+    min-height: 44px;
+    border-radius: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .instrument-input {
+    max-width: none;
+    padding: 8px 10px;
+    font-size: 0.875rem;
+    min-height: 44px;
+    border-radius: 8px;
+  }
+
+  .sticky-header-container {
+    padding: 0;
+  }
+
+  .header-actions {
+    padding: 10px 16px;
+    gap: 8px;
+  }
+
+  .header-actions .btn-save,
+  .header-actions .btn-preview {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+
+  .song-strip {
+    height: 36px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .strip-segment {
+    font-size: 0.7rem;
+    padding: 0 8px;
+    flex-shrink: 0;
+    min-width: 48px;
+  }
+
+  /* Section card mobile */
+  .sections-container {
+    padding: 14px 16px;
+  }
+
+  .section-card {
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+  }
+
+  .section-card.active {
+    transform: none;
+  }
+
+  .section-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+  }
+
+  .section-title {
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .name-input {
+    font-size: 1.0625rem;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+
+  .bar-control {
+    font-size: 0.8125rem;
+    padding: 3px;
+  }
+
+  .bar-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 0.9rem;
+  }
+
+  .bar-input {
+    width: 36px;
+  }
+
+  .section-actions {
+    gap: 8px;
+  }
+
+  .section-instructions {
+    font-size: 0.8125rem;
+    padding: 4px 10px;
+  }
+
+  .btn-remove {
+    padding: 6px;
+    font-size: 1.1rem;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .instruments-grid {
+    gap: 10px;
+  }
+
+  .instrument-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .instrument-name {
+    width: 64px;
+    font-size: 0.8125rem;
+  }
+
+  .pattern-map {
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .bar-row {
+    gap: 6px;
+  }
+
+  .bar-container {
+    gap: 3px;
+  }
+
+  .bar-header {
+    margin-bottom: 2px;
+  }
+
+  .bar-label {
+    font-size: 0.65rem;
+    min-width: 18px;
+  }
+
+  .bar-menu-btn {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 0.65rem;
+  }
+
+  .bar-menu-dropdown {
+    min-width: 140px;
+    font-size: 0.8125rem;
+  }
+
+  .bar-menu-item {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .bar-beats {
+    gap: 1px;
+    padding: 1px;
+    border-radius: 4px;
+  }
+
+  .beat-block {
+    width: 22px;
+    height: 22px;
+    font-size: 0.65rem;
+    border-radius: 3px;
+  }
+
+  .btn-add {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-top {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .btn-back {
+    padding: 8px 10px;
+    font-size: 0.8125rem;
+    min-height: 40px;
+  }
+
+  .header-content-row {
+    gap: 8px;
+  }
+
+  .song-title-input {
+    font-size: 1rem;
+    padding: 8px 10px;
+    min-height: 40px;
+  }
+
+  .bpm,
+  .time-sig {
+    padding: 5px 8px;
+    min-height: 38px;
+    font-size: 0.75rem;
+  }
+
+  .meta-value-input {
+    width: 44px;
+    font-size: 0.8125rem;
+    min-height: 30px;
+  }
+
+  .filter-btn,
+  .instrument-tag {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    min-height: 38px;
+  }
+
+  .instrument-select,
+  .instrument-input {
+    padding: 8px 10px;
+    font-size: 0.8125rem;
+    min-height: 40px;
   }
 
   .header-actions {
     width: 100%;
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .header-actions .btn-save,
+  .header-actions .btn-preview {
+    flex: 1;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 0.8125rem;
+  }
+
+  /* Section card – extra small screens */
+  .sections-container {
+    padding: 10px 12px;
+  }
+
+  .section-card {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border-left-width: 4px;
+  }
+
+  .section-header {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    gap: 8px;
+  }
+
+  .section-title {
+    gap: 6px;
+  }
+
+  .name-input {
+    font-size: 1rem;
+    padding: 6px 8px;
+  }
+
+  .bar-control {
+    font-size: 0.75rem;
+  }
+
+  .bar-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .bar-input {
+    width: 32px;
+  }
+
+  .section-instructions {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .instruments-grid {
+    gap: 8px;
+  }
+
+  .instrument-name {
+    width: 56px;
+    font-size: 0.75rem;
+  }
+
+  .pattern-map {
+    gap: 6px;
+  }
+
+  .bar-row {
+    gap: 4px;
+  }
+
+  .bar-beats {
+    gap: 1px;
+    padding: 1px;
+  }
+
+  .beat-block {
+    width: 20px;
+    height: 20px;
+    font-size: 0.6rem;
+  }
+
+  .bar-menu-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .btn-add {
+    padding: 12px;
+    font-size: 0.875rem;
+    border-radius: 8px;
   }
 
   .preview-header {
