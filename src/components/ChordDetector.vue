@@ -33,6 +33,7 @@
         v-for="(chordGroup, index) in detectedChords"
         :key="index"
         class="chord-item"
+        :class="{ 'chord-item--playing': isChordPlaying(chordGroup) }"
       >
         <span class="chord-name">{{ chordGroup.chord.fullName }}</span>
         <span class="chord-time">{{ formatTime(chordGroup.startTime) }} - {{ formatTime(chordGroup.endTime) }}</span>
@@ -56,6 +57,10 @@ const props = defineProps({
     type: File,
     required: false,
     default: null
+  },
+  currentTime: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -84,6 +89,11 @@ const formatDuration = (seconds) => {
     return `${Math.round(seconds * 1000)}ms`
   }
   return `${seconds.toFixed(1)}s`
+}
+
+const isChordPlaying = (chordGroup) => {
+  const t = props.currentTime
+  return t >= chordGroup.startTime && t < chordGroup.endTime
 }
 </script>
 
@@ -210,6 +220,15 @@ const formatDuration = (seconds) => {
 .chord-item:hover {
   transform: translateX(5px);
   box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.chord-item--playing {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+  transform: scale(1.02);
+  background: linear-gradient(135deg, #7c8ff0 0%, #8b5cb8 100%);
+}
+.chord-item--playing:hover {
+  transform: translateX(5px) scale(1.02);
 }
 
 .chord-name {

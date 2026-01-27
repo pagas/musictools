@@ -35,6 +35,7 @@
 
       <ChordDetector
         :file="file"
+        :current-time="currentTime"
       />
 
       <WaveformViewer
