@@ -113,8 +113,11 @@ export const fetchUsers = async () => {
 // This uses Firebase Admin SDK on the backend, so the admin stays logged in
 export const createUser = async (email, password, displayName, role = 'user') => {
   try {
+    console.log('Calling createUser Cloud Function...', { email, displayName, role })
     const createUserFunction = httpsCallable(functions, 'createUser')
+    console.log('Function reference created:', createUserFunction)
     const result = await createUserFunction({ email, password, displayName, role })
+    console.log('Function call successful:', result)
     
     const newUser = result.data
     
