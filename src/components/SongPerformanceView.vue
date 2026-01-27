@@ -2378,9 +2378,14 @@ watch(() => song.value, (newSong, oldSong) => {
   overflow-x: hidden;
   padding: 12px;
   scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .preview-section-card {
+  width: 100%;
+  max-width: 860px;
   background: #fff;
   border-radius: 8px;
   padding: 12px;
