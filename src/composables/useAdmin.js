@@ -65,6 +65,25 @@ export const updateUserRole = async (userId, newRole) => {
   }
 }
 
+// Update user display name (Firestore users collection)
+export const updateUserDisplayName = async (userId, displayName) => {
+  try {
+    const userDocRef = doc(db, 'users', userId)
+    const value = displayName != null && String(displayName).trim() !== '' ? String(displayName).trim() : null
+    await updateDoc(userDocRef, { displayName: value })
+    
+    const userIndex = usersList.value.findIndex(u => u.uid === userId)
+    if (userIndex !== -1) {
+      usersList.value[userIndex].displayName = value
+    }
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating user display name:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 // Get all users from Firestore users collection
 export const fetchUsers = async () => {
   loadingUsers.value = true
@@ -219,6 +238,7 @@ export function useAdmin() {
     isAdmin,
     getUserRole,
     updateUserRole,
+    updateUserDisplayName,
     createUser,
     deleteUser,
     fetchUsers,

@@ -30,13 +30,21 @@
           <tbody>
             <tr v-for="user in users" :key="user.uid" class="user-row">
               <td>{{ user.email || user.uid }}</td>
-              <td>{{ user.displayName || '-' }}</td>
+              <td>
+                <input
+                  v-if="editingUserId === user.uid"
+                  v-model="editingDisplayName"
+                  class="edit-display-name-input"
+                  placeholder="Display name"
+                  type="text"
+                />
+                <span v-else>{{ user.displayName || '-' }}</span>
+              </td>
               <td>
                 <select 
                   v-if="editingUserId === user.uid"
                   v-model="editingRole"
                   class="role-select"
-                  @change="saveUserRole(user.uid)"
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
@@ -46,20 +54,29 @@
                 </span>
               </td>
               <td>
+                <template v-if="editingUserId === user.uid">
+                  <button 
+                    @click="saveUserEdits(user.uid)"
+                    class="btn-save"
+                    :disabled="savingUserId === user.uid"
+                  >
+                    {{ savingUserId === user.uid ? '…' : 'Save' }}
+                  </button>
+                  <button 
+                    @click="cancelEdit"
+                    class="btn-cancel"
+                    :disabled="savingUserId === user.uid"
+                  >
+                    Cancel
+                  </button>
+                </template>
                 <button 
-                  v-if="editingUserId !== user.uid"
-                  @click="startEdit(user.uid, user.role || 'user')"
+                  v-else
+                  @click="startEdit(user.uid, user.role || 'user', user.displayName)"
                   class="btn-edit"
                   :disabled="savingUserId === user.uid || deletingUserId === user.uid"
                 >
                   ✏️ Edit
-                </button>
-                <button 
-                  v-else
-                  @click="cancelEdit"
-                  class="btn-cancel"
-                >
-                  Cancel
                 </button>
               </td>
               <td>
@@ -171,12 +188,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAdmin } from '../composables/useAdmin'
 
-const { fetchUsers, usersList, loadingUsers, updateUserRole, deleteUser, createUser } = useAdmin()
+const { fetchUsers, usersList, loadingUsers, updateUserRole, updateUserDisplayName, deleteUser, createUser } = useAdmin()
 
 const loading = ref(false)
 const error = ref(null)
 const editingUserId = ref(null)
 const editingRole = ref('user')
+const editingDisplayName = ref('')
 const savingUserId = ref(null)
 const deletingUserId = ref(null)
 const showCreateForm = ref(false)
@@ -201,26 +219,36 @@ const loadUsers = async () => {
   loading.value = false
 }
 
-const startEdit = (userId, currentRole) => {
+const startEdit = (userId, currentRole, currentDisplayName) => {
   editingUserId.value = userId
   editingRole.value = currentRole
+  editingDisplayName.value = currentDisplayName != null ? String(currentDisplayName) : ''
 }
 
 const cancelEdit = () => {
   editingUserId.value = null
   editingRole.value = 'user'
+  editingDisplayName.value = ''
 }
 
-const saveUserRole = async (userId) => {
+const saveUserEdits = async (userId) => {
   savingUserId.value = userId
-  const result = await updateUserRole(userId, editingRole.value)
-  
-  if (result.success) {
-    editingUserId.value = null
-    editingRole.value = 'user'
-  } else {
-    error.value = result.error || 'Failed to update user role'
+  error.value = null
+  const roleResult = await updateUserRole(userId, editingRole.value)
+  if (!roleResult.success) {
+    error.value = roleResult.error || 'Failed to update user role'
+    savingUserId.value = null
+    return
   }
+  const displayResult = await updateUserDisplayName(userId, editingDisplayName.value)
+  if (!displayResult.success) {
+    error.value = displayResult.error || 'Failed to update display name'
+    savingUserId.value = null
+    return
+  }
+  editingUserId.value = null
+  editingRole.value = 'user'
+  editingDisplayName.value = ''
   savingUserId.value = null
 }
 
@@ -407,6 +435,21 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+.edit-display-name-input {
+  padding: 6px 12px;
+  border: 2px solid #667eea;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+  color: #2d3748;
+  min-width: 140px;
+}
+
+.edit-display-name-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .role-badge {
   display: inline-block;
   padding: 4px 12px;
@@ -438,7 +481,8 @@ onMounted(() => {
 }
 
 .btn-edit,
-.btn-cancel {
+.btn-cancel,
+.btn-save {
   background: #667eea;
   color: white;
   border: none;
@@ -448,6 +492,20 @@ onMounted(() => {
   font-size: 0.85rem;
   font-weight: 600;
   transition: all 0.2s;
+  margin-right: 6px;
+}
+
+.btn-save {
+  background: #38a169;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #2f855a;
+}
+
+.btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-edit:hover:not(:disabled) {
