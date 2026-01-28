@@ -169,14 +169,15 @@
             <span>BPM: {{ songItem.bpm }}</span>
             <span>Time: {{ songItem.timeSignature }}</span>
             <span v-if="songItem.key">Key: {{ songItem.key }}</span>
-            <span>{{ songItem.sections.length }} sections</span>
           </div>
           <div class="song-card-sections">
-            <span v-for="(section, index) in songItem.sections.slice(0, 3)" :key="index" class="section-tag">
-              {{ section.name }}
-            </span>
-            <span v-if="songItem.sections.length > 3" class="section-tag more">
-              +{{ songItem.sections.length - 3 }} more
+            <span
+              v-for="inst in (songItem.instruments || [])"
+              :key="inst"
+              class="section-tag"
+              :class="{ 'section-tag-selected': songItem.metadata?.selectedInstrument === inst }"
+            >
+              {{ inst }}
             </span>
           </div>
         </div>
@@ -1702,9 +1703,9 @@ watch(() => song.value, (newSong, oldSong) => {
   line-height: 1.4;
 }
 
-.section-tag.more {
-  background: #f7fafc;
-  color: #718096;
+.section-tag-selected {
+  background: #667eea;
+  color: white;
 }
 
 .empty-state {
