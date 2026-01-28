@@ -27,7 +27,10 @@
               :alt="user.displayName || 'User'"
               class="user-avatar"
             />
-            <span class="user-name">{{ user?.displayName || user?.email }}</span>
+            <span class="user-name">
+              {{ user?.displayName || user?.email }}
+              <span v-if="isAdmin" class="admin-badge" title="Administrator">👑</span>
+            </span>
           </div>
           <button v-if="isAuthenticated" class="btn-logout" @click="handleLogout" title="Sign out">
             Sign Out
@@ -286,6 +289,14 @@ header h1 {
 .user-name {
   font-size: 0.95rem;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-badge {
+  font-size: 0.85rem;
+  opacity: 0.9;
 }
 
 .btn-logout,
