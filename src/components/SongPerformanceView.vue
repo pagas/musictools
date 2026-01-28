@@ -2385,7 +2385,7 @@ watch(() => song.value, (newSong, oldSong) => {
   overflow-x: auto;
   z-index: 5;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 6px 0;
+  padding: 6px 15px 6px 0;
 }
 
 .preview-strip-segment {
@@ -2954,7 +2954,7 @@ watch(() => song.value, (newSong, oldSong) => {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 6px 4px;
+    padding: 6px 16px 6px 4px;
     position: relative;
     top: 0;
   }
@@ -3190,6 +3190,7 @@ watch(() => song.value, (newSong, oldSong) => {
     width: 64px;
     min-width: 64px;
     max-width: 64px;
+    padding: 6px 4px;
   }
 
   .preview-strip-segment {
