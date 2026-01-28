@@ -14,13 +14,20 @@ const loading = ref(true)
 
 // Initialize auth state listener
 onAuthStateChanged(auth, async (firebaseUser) => {
+  const previousUser = user.value
   user.value = firebaseUser
   
   // Update user document in Firestore if it exists (sync email/displayName)
-  if (firebaseUser) {
+  // Only do this if user actually changed to avoid unnecessary Firestore operations
+  if (firebaseUser && (!previousUser || previousUser.uid !== firebaseUser.uid)) {
     try {
       const userDocRef = doc(db, 'users', firebaseUser.uid)
       const userDoc = await getDoc(userDocRef)
+      
+      // Double-check user hasn't changed during async operation
+      if (user.value?.uid !== firebaseUser.uid) {
+        return
+      }
       
       if (userDoc.exists()) {
         // Update email/displayName if they've changed
@@ -34,19 +41,28 @@ onAuthStateChanged(auth, async (firebaseUser) => {
         }
         
         if (Object.keys(updates).length > 0) {
-          await updateDoc(userDocRef, updates)
+          // Verify user still matches before updating
+          if (user.value?.uid === firebaseUser.uid) {
+            await updateDoc(userDocRef, updates)
+          }
         }
       } else {
         // Create user document if it doesn't exist
-        await setDoc(userDocRef, {
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || null,
-          role: 'user',
-          createdAt: new Date().toISOString()
-        })
+        // Verify user still matches before creating
+        if (user.value?.uid === firebaseUser.uid) {
+          await setDoc(userDocRef, {
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || null,
+            role: 'user',
+            createdAt: new Date().toISOString()
+          })
+        }
       }
     } catch (error) {
-      console.error('Error syncing user data:', error)
+      // Ignore errors if user changed during operation
+      if (user.value?.uid === firebaseUser.uid) {
+        console.error('Error syncing user data:', error)
+      }
     }
   }
   

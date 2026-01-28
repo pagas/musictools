@@ -19,21 +19,43 @@ export function useSongs() {
   const songs = ref([])
   const loading = ref(true)
   let unsubscribe = null
+  let currentUserId = null
+  let isCleaningUp = false
 
   // Load songs from Firestore for the current user
-  const loadSongs = () => {
-    // Clean up existing listener
+  const loadSongs = async () => {
+    // Mark as cleaning up to prevent race conditions
+    isCleaningUp = true
+    
+    // Clean up existing listener first - wait for it to complete
     if (unsubscribe) {
-      unsubscribe()
+      try {
+        unsubscribe()
+      } catch (error) {
+        // Ignore errors during cleanup
+        console.warn('Error during listener cleanup:', error)
+      }
       unsubscribe = null
     }
-
-    if (!user.value) {
-      songs.value = []
-      loading.value = false
-      return
+    
+    // Wait a bit longer to ensure cleanup completes
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Check if user changed during cleanup
+    if (!user.value || user.value.uid !== currentUserId) {
+      if (!user.value) {
+        songs.value = []
+        loading.value = false
+        currentUserId = null
+        isCleaningUp = false
+        return
+      }
+      // User changed, update currentUserId and continue
+      currentUserId = user.value.uid
     }
-
+    
+    isCleaningUp = false
+    const userIdToLoad = user.value.uid
     loading.value = true
 
     try {
@@ -42,38 +64,56 @@ export function useSongs() {
       // for (userId, createdAt)
       const q = query(
         collection(db, 'songs'),
-        where('userId', '==', user.value.uid),
+        where('userId', '==', userIdToLoad),
         orderBy('createdAt', 'desc')
       )
 
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          // Small delay to avoid race conditions with concurrent updates
-          setTimeout(() => {
-            try {
-              songs.value = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-              }))
-              loading.value = false
-            } catch (error) {
-              // Catch Firestore internal assertion errors and ignore them
-              if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
-                console.warn('Firestore internal assertion error caught in listener, ignoring:', error)
-                // Don't update songs.value to avoid corruption
-                return
-              }
-              console.error('Error processing snapshot:', error)
+          // Verify user hasn't changed before processing
+          if (isCleaningUp || !user.value || user.value.uid !== userIdToLoad) {
+            return
+          }
+          
+          try {
+            // Catch Firestore internal assertion errors early
+            if (!snapshot || !snapshot.docs) {
+              console.warn('Invalid snapshot received, skipping')
+              return
+            }
+            
+            songs.value = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            loading.value = false
+          } catch (error) {
+            // Catch Firestore internal assertion errors and ignore them
+            if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
+              console.warn('Firestore internal assertion error caught in listener, ignoring:', error)
+              return
+            }
+            console.error('Error processing snapshot:', error)
+            if (!isCleaningUp && user.value && user.value.uid === userIdToLoad) {
               loading.value = false
             }
-          }, 0)
+          }
         },
         (error) => {
+          // Verify user hasn't changed before handling error
+          if (isCleaningUp || !user.value || user.value.uid !== userIdToLoad) {
+            return
+          }
+          
           console.error('Error loading songs:', error)
           // Clean up the failed listener
           if (unsubscribe) {
-            unsubscribe()
+            try {
+              unsubscribe()
+            } catch (cleanupError) {
+              // Ignore cleanup errors
+            }
             unsubscribe = null
           }
           
@@ -82,63 +122,81 @@ export function useSongs() {
             console.warn('Index not found, loading without orderBy')
             const qSimple = query(
               collection(db, 'songs'),
-              where('userId', '==', user.value.uid)
+              where('userId', '==', userIdToLoad)
             )
             unsubscribe = onSnapshot(
               qSimple,
               (snapshot) => {
-                // Small delay to avoid race conditions with concurrent updates
-                setTimeout(() => {
-                  try {
-                    songs.value = snapshot.docs.map(doc => ({
-                      id: doc.id,
-                      ...doc.data()
-                    })).sort((a, b) => {
-                      // Sort by createdAt if available, otherwise by id
-                      const aTime = a.createdAt?.toMillis?.() || 0
-                      const bTime = b.createdAt?.toMillis?.() || 0
-                      return bTime - aTime
-                    })
-                    loading.value = false
-                  } catch (error) {
-                    // Catch Firestore internal assertion errors and ignore them
-                    if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
-                      console.warn('Firestore internal assertion error caught in fallback listener, ignoring:', error)
-                      return
-                    }
-                    console.error('Error processing fallback snapshot:', error)
+                // Verify user hasn't changed before processing
+                if (isCleaningUp || !user.value || user.value.uid !== userIdToLoad) {
+                  return
+                }
+                
+                try {
+                  if (!snapshot || !snapshot.docs) {
+                    console.warn('Invalid fallback snapshot received, skipping')
+                    return
+                  }
+                  
+                  songs.value = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  })).sort((a, b) => {
+                    // Sort by createdAt if available, otherwise by id
+                    const aTime = a.createdAt?.toMillis?.() || 0
+                    const bTime = b.createdAt?.toMillis?.() || 0
+                    return bTime - aTime
+                  })
+                  loading.value = false
+                } catch (error) {
+                  // Catch Firestore internal assertion errors and ignore them
+                  if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
+                    console.warn('Firestore internal assertion error caught in fallback listener, ignoring:', error)
+                    return
+                  }
+                  console.error('Error processing fallback snapshot:', error)
+                  if (!isCleaningUp && user.value && user.value.uid === userIdToLoad) {
                     loading.value = false
                   }
-                }, 0)
+                }
               },
               (err) => {
+                if (isCleaningUp || !user.value || user.value.uid !== userIdToLoad) {
+                  return
+                }
                 console.error('Error loading songs (fallback):', err)
                 loading.value = false
                 // Clean up on error
                 if (unsubscribe) {
-                  unsubscribe()
+                  try {
+                    unsubscribe()
+                  } catch (cleanupError) {
+                    // Ignore cleanup errors
+                  }
                   unsubscribe = null
                 }
               }
             )
           } else {
-            loading.value = false
+            if (!isCleaningUp && user.value && user.value.uid === userIdToLoad) {
+              loading.value = false
+            }
           }
         }
       )
     } catch (error) {
       console.error('Error setting up songs listener:', error)
-      loading.value = false
+      if (!isCleaningUp && user.value && user.value.uid === userIdToLoad) {
+        loading.value = false
+      }
     }
   }
 
   // Watch for user changes and reload songs
-  watch(() => user.value, (newUser, oldUser) => {
+  watch(() => user.value, async (newUser, oldUser) => {
     if (newUser?.uid !== oldUser?.uid) {
-      // Small delay to ensure previous cleanup completes
-      setTimeout(() => {
-        loadSongs()
-      }, 0)
+      currentUserId = newUser?.uid || null
+      await loadSongs()
     }
   }, { immediate: true })
 
@@ -216,14 +274,17 @@ export function useSongs() {
 
   // Cleanup listener on unmount
   onUnmounted(() => {
+    isCleaningUp = true
     if (unsubscribe) {
       try {
         unsubscribe()
       } catch (error) {
-        console.error('Error unsubscribing from songs listener:', error)
+        // Ignore errors during cleanup - listener may already be closed
+        console.warn('Error unsubscribing from songs listener (ignored):', error)
       }
       unsubscribe = null
     }
+    currentUserId = null
   })
 
   return {
