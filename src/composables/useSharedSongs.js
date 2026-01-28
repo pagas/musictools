@@ -73,6 +73,7 @@ export async function getSharedSong(shareId) {
       title: data.title ?? 'Shared Song',
       bpm: data.bpm ?? 120,
       timeSignature: data.timeSignature ?? '4/4',
+      key: data.key ?? 'C',
       instruments: data.instruments ?? ['Drums', 'Bass', 'Guitar', 'Keys'],
       sections: data.sections ?? [],
       metadata: data.metadata ?? {}
