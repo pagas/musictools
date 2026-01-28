@@ -180,6 +180,49 @@
     </div>
   </Teleport>
 
+  <!-- Instruments Dialog -->
+  <Teleport to="body">
+    <div v-if="showInstrumentsDialog" class="share-dialog-overlay instruments-dialog-overlay" @click="closeInstrumentsDialog">
+      <div class="share-dialog instruments-dialog" @click.stop>
+        <div class="share-dialog-header">
+          <h3>Instruments</h3>
+          <button class="share-dialog-close" @click="closeInstrumentsDialog" title="Close">✕</button>
+        </div>
+        <div class="share-dialog-content">
+          <div class="instrument-manager" v-if="song">
+            <div class="instrument-dropdown-wrapper">
+              <select v-model="newInstrumentName" class="instrument-select" @change="addInstrument">
+                <option value="">Add Instrument...</option>
+                <option value="Drums">Drums</option>
+                <option value="Bass">Bass</option>
+                <option value="Guitar">Guitar</option>
+                <option value="Keys">Keys</option>
+                <option value="Piano">Piano</option>
+                <option value="Vocals">Vocals</option>
+                <option value="Strings">Strings</option>
+                <option value="Brass">Brass</option>
+                <option value="Percussion">Percussion</option>
+                <option value="Synth">Synth</option>
+              </select>
+              <input v-model="customInstrumentName" type="text" placeholder="Or type custom name"
+                class="instrument-input" @keyup.enter="addCustomInstrument" @blur="addCustomInstrument" />
+            </div>
+            <div class="instruments-dialog-list">
+              <span v-for="inst in (song?.instruments || [])" :key="inst" class="instrument-tag instruments-dialog-tag">
+                {{ inst }}
+                <button class="instrument-remove" @click.stop="removeInstrument(inst)" title="Remove instrument">×</button>
+              </span>
+              <span v-if="!(song?.instruments?.length)" class="instruments-dialog-empty">No instruments yet. Add one above.</span>
+            </div>
+          </div>
+          <div class="instruments-dialog-footer">
+            <button type="button" class="btn-ok-instruments" @click="closeInstrumentsDialog">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div v-if="!isShowingPreview" class="performance-view">
     <!-- Song List View -->
     <div v-if="showSongList" class="song-list-view">
@@ -233,6 +276,9 @@
             <button class="btn-back" @click="goToSongList" title="Back to Songs">
               ← Back
             </button>
+            <button v-if="song" class="btn-instruments" @click="openInstrumentsDialog" title="Manage instruments">
+              Instruments
+            </button>
             <button v-if="song" class="btn-share" @click="openShareDialog" :disabled="shareLoading" title="Share song">
               {{ shareLoading ? '…' : 'Share' }}
             </button>
@@ -283,29 +329,6 @@
                   <span class="label">Chords:</span>
                   <span class="chords-preview">{{ chordsPreview }}</span>
                 </span>
-              </div>
-            </div>
-
-            <!-- Instrument Manager (add/remove instruments) -->
-            <div class="instrument-filter" v-if="song">
-              <div class="instrument-manager">
-                <div class="instrument-dropdown-wrapper">
-                  <select v-model="newInstrumentName" class="instrument-select" @change="addInstrument">
-                    <option value="">Add Instrument...</option>
-                    <option value="Drums">Drums</option>
-                    <option value="Bass">Bass</option>
-                    <option value="Guitar">Guitar</option>
-                    <option value="Keys">Keys</option>
-                    <option value="Piano">Piano</option>
-                    <option value="Vocals">Vocals</option>
-                    <option value="Strings">Strings</option>
-                    <option value="Brass">Brass</option>
-                    <option value="Percussion">Percussion</option>
-                    <option value="Synth">Synth</option>
-                  </select>
-                  <input v-model="customInstrumentName" type="text" placeholder="Or type custom name"
-                    class="instrument-input" @keyup.enter="addCustomInstrument" @blur="addCustomInstrument" />
-                </div>
               </div>
             </div>
 
@@ -538,6 +561,11 @@ const chordsPreview = computed(() => {
 // Chords dialog state
 const showChordsDialog = ref(false)
 const chordToAdd = ref('')
+
+// Instruments dialog state
+const showInstrumentsDialog = ref(false)
+const openInstrumentsDialog = () => { showInstrumentsDialog.value = true }
+const closeInstrumentsDialog = () => { showInstrumentsDialog.value = false }
 
 // Share link state
 const shareLoading = ref(false)
@@ -1987,6 +2015,52 @@ watch(() => song.value, (newSong, oldSong) => {
   border-color: #667eea;
 }
 
+.instruments-dialog .instrument-manager {
+  min-width: 320px;
+}
+
+.instruments-dialog-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.instruments-dialog-tag {
+  cursor: default;
+}
+
+.instruments-dialog-empty {
+  color: #999;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.instruments-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 16px;
+}
+
+.btn-ok-instruments {
+  padding: 10px 24px;
+  border: 1px solid #667eea;
+  background: #667eea;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-ok-instruments:hover {
+  background: #5568d3;
+}
+
 .instrument-tag {
   display: inline-flex;
   align-items: center;
@@ -2604,6 +2678,23 @@ watch(() => song.value, (newSong, oldSong) => {
 .btn-share:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.btn-instruments {
+  padding: 8px 14px;
+  border: 1px solid #888;
+  background: rgba(0, 0, 0, 0.04);
+  color: #444;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-instruments:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: #666;
 }
 
 /* Share Dialog */
@@ -3570,7 +3661,8 @@ watch(() => song.value, (newSong, oldSong) => {
     gap: 8px;
   }
 
-  .header-top-row .btn-share {
+  .header-top-row .btn-share,
+  .header-top-row .btn-instruments {
     min-height: 40px;
     padding: 8px 12px;
     font-size: 0.8125rem;
