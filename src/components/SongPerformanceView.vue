@@ -276,12 +276,23 @@
             <button class="btn-back" @click="goToSongList" title="Back to Songs">
               ← Back
             </button>
-            <button v-if="song" class="btn-instruments" @click="openInstrumentsDialog" title="Manage instruments">
-              Instruments
-            </button>
-            <button v-if="song" class="btn-share" @click="openShareDialog" :disabled="shareLoading" title="Share song">
-              {{ shareLoading ? '…' : 'Share' }}
-            </button>
+            <div v-if="song" class="header-dropdown-wrapper" ref="headerDropdownRef">
+              <button type="button" class="btn-dropdown-trigger" :class="{ open: showHeaderDropdown }"
+                @click.stop="showHeaderDropdown = !showHeaderDropdown" title="Actions">
+                Actions ▾
+              </button>
+              <Transition name="dropdown">
+                <div v-if="showHeaderDropdown" class="header-dropdown-menu" @click.stop>
+                  <button type="button" class="header-dropdown-item" @click="onHeaderDropdownInstruments">
+                    Instruments
+                  </button>
+                  <button type="button" class="header-dropdown-item" @click="onHeaderDropdownShare"
+                    :disabled="shareLoading">
+                    {{ shareLoading ? '…' : 'Share' }}
+                  </button>
+                </div>
+              </Transition>
+            </div>
           </div>
           <div v-if="song" class="header-content-row">
 
@@ -566,6 +577,28 @@ const chordToAdd = ref('')
 const showInstrumentsDialog = ref(false)
 const openInstrumentsDialog = () => { showInstrumentsDialog.value = true }
 const closeInstrumentsDialog = () => { showInstrumentsDialog.value = false }
+
+// Header dropdown (Actions → Instruments / Share)
+const showHeaderDropdown = ref(false)
+const headerDropdownRef = ref(null)
+const closeHeaderDropdown = () => { showHeaderDropdown.value = false }
+const onHeaderDropdownInstruments = () => {
+  closeHeaderDropdown()
+  openInstrumentsDialog()
+}
+const onHeaderDropdownShare = () => {
+  if (shareLoading.value) return
+  closeHeaderDropdown()
+  openShareDialog()
+}
+watch(showHeaderDropdown, (open) => {
+  if (!open) return
+  const close = () => {
+    showHeaderDropdown.value = false
+    document.removeEventListener('click', close)
+  }
+  nextTick(() => setTimeout(() => document.addEventListener('click', close), 0))
+})
 
 // Share link state
 const shareLoading = ref(false)
@@ -1618,6 +1651,80 @@ watch(() => song.value, (newSong, oldSong) => {
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.header-dropdown-wrapper {
+  position: relative;
+  margin-left: auto;
+}
+
+.btn-dropdown-trigger {
+  padding: 8px 14px;
+  border: 1px solid #888;
+  background: rgba(0, 0, 0, 0.04);
+  color: #444;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-dropdown-trigger:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: #666;
+}
+
+.btn-dropdown-trigger.open {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.08);
+  color: #667eea;
+}
+
+.header-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  min-width: 160px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 6px 0;
+  z-index: 1000;
+}
+
+.header-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.header-dropdown-item:hover:not(:disabled) {
+  background: #f0f2f5;
+}
+
+.header-dropdown-item:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .header-content-row {
@@ -3661,8 +3768,7 @@ watch(() => song.value, (newSong, oldSong) => {
     gap: 8px;
   }
 
-  .header-top-row .btn-share,
-  .header-top-row .btn-instruments {
+  .header-top-row .btn-dropdown-trigger {
     min-height: 40px;
     padding: 8px 12px;
     font-size: 0.8125rem;
