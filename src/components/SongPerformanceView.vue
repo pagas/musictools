@@ -8,6 +8,7 @@
         <div class="preview-meta">
           <span>BPM: {{ previewSong.bpm }}</span>
           <span>Time: {{ previewSong.timeSignature }}</span>
+          <span v-if="previewSong.key">Key: {{ previewSong.key }}</span>
         </div>
       </div>
       <div class="preview-header-actions">
@@ -106,6 +107,7 @@
           <div class="song-card-meta">
             <span>BPM: {{ songItem.bpm }}</span>
             <span>Time: {{ songItem.timeSignature }}</span>
+            <span v-if="songItem.key">Key: {{ songItem.key }}</span>
             <span>{{ songItem.sections.length }} sections</span>
           </div>
           <div class="song-card-sections">
@@ -170,6 +172,17 @@
                     class="meta-value-input"
                     @keyup.enter="$event.target.blur()"
                   />
+                </span>
+                <span class="key">
+                  <span class="label">KEY</span>
+                  <select 
+                    v-model="song.key" 
+                    class="meta-value-input meta-select"
+                  >
+                    <option v-for="note in KEY_OPTIONS" :key="note" :value="note">
+                      {{ note }}
+                    </option>
+                  </select>
                 </span>
               </div>
             </div>
@@ -357,6 +370,8 @@ const props = defineProps({
   sharedSong: { type: Object, default: null }
 })
 
+const KEY_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
 const router = useRouter()
 const route = useRoute()
 
@@ -369,6 +384,7 @@ const createDefaultSong = () => ({
   title: 'New Song',
   bpm: 120,
   timeSignature: '4/4',
+  key: 'C',
   instruments: ['Drums', 'Bass', 'Guitar', 'Keys'],
   sections: [
     {
@@ -1325,6 +1341,11 @@ watch(() => song.value, (newSong, oldSong) => {
     if (!newSong.instruments || newSong.instruments.length === 0) {
       newSong.instruments = ['Drums', 'Bass', 'Guitar', 'Keys']
     }
+    
+    // Ensure key exists, initialize with default if missing
+    if (!newSong.key) {
+      newSong.key = 'C'
+    }
 
     // Song loaded, mark as initialized after a brief delay
     setTimeout(() => {
@@ -1619,7 +1640,8 @@ watch(() => song.value, (newSong, oldSong) => {
 }
 
 .bpm,
-.time-sig {
+.time-sig,
+.key {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2625,10 +2647,8 @@ watch(() => song.value, (newSong, oldSong) => {
 .preview-bar-beats {
   display: flex;
   gap: 2px;
-  background: #f7fafc;
   padding: 2px;
   border-radius: 4px;
-  border: 1px solid #e2e8f0;
   flex: 1 1 0;
   min-width: 0;
 }
@@ -2727,7 +2747,8 @@ watch(() => song.value, (newSong, oldSong) => {
   }
 
   .bpm,
-  .time-sig {
+  .time-sig,
+  .key {
     padding: 6px 10px;
     min-height: 40px;
     font-size: 0.8125rem;
