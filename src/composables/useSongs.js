@@ -57,6 +57,12 @@ export function useSongs() {
         },
         (error) => {
           console.error('Error loading songs:', error)
+          // Clean up the failed listener
+          if (unsubscribe) {
+            unsubscribe()
+            unsubscribe = null
+          }
+          
           // If ordering fails, try without orderBy
           if (error.code === 'failed-precondition') {
             console.warn('Index not found, loading without orderBy')
@@ -81,6 +87,11 @@ export function useSongs() {
               (err) => {
                 console.error('Error loading songs (fallback):', err)
                 loading.value = false
+                // Clean up on error
+                if (unsubscribe) {
+                  unsubscribe()
+                  unsubscribe = null
+                }
               }
             )
           } else {
@@ -97,7 +108,10 @@ export function useSongs() {
   // Watch for user changes and reload songs
   watch(() => user.value, (newUser, oldUser) => {
     if (newUser?.uid !== oldUser?.uid) {
-      loadSongs()
+      // Small delay to ensure previous cleanup completes
+      setTimeout(() => {
+        loadSongs()
+      }, 0)
     }
   }, { immediate: true })
 
@@ -160,7 +174,12 @@ export function useSongs() {
   // Cleanup listener on unmount
   onUnmounted(() => {
     if (unsubscribe) {
-      unsubscribe()
+      try {
+        unsubscribe()
+      } catch (error) {
+        console.error('Error unsubscribing from songs listener:', error)
+      }
+      unsubscribe = null
     }
   })
 
