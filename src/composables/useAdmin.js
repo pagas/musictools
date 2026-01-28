@@ -185,6 +185,28 @@ export const deleteUser = async (userId) => {
   }
 }
 
+// Copy song to another user (admin only, via Cloud Function)
+export const copySongToUser = async (songId, targetUserId) => {
+  try {
+    const copySongToUserFunction = httpsCallable(functions, 'copySongToUser')
+    const result = await copySongToUserFunction({ songId, targetUserId })
+    return { success: true, newSongId: result.data.newSongId }
+  } catch (error) {
+    console.error('Error copying song to user:', error)
+    let errorMessage = 'Failed to copy song to user.'
+    if (error.code === 'functions/permission-denied') {
+      errorMessage = 'Only admins can copy songs to users.'
+    } else if (error.code === 'functions/not-found') {
+      errorMessage = 'Song not found.'
+    } else if (error.code === 'functions/invalid-argument') {
+      errorMessage = error.message || 'Invalid input.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    return { success: false, error: errorMessage }
+  }
+}
+
 // Initialize current user's role
 export const initializeUserRole = async () => {
   if (user.value) {
@@ -202,6 +224,7 @@ export function useAdmin() {
     fetchUsers,
     usersList,
     loadingUsers,
+    copySongToUser,
     initializeUserRole
   }
 }
