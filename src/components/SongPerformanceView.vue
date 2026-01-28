@@ -2599,7 +2599,7 @@ watch(() => song.value, (newSong, oldSong) => {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* keep all bars on one line */
 }
 
 .preview-bar-row-number {
@@ -2618,6 +2618,8 @@ watch(() => song.value, (newSong, oldSong) => {
 .preview-bar-container {
   display: flex;
   align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .preview-bar-beats {
@@ -2627,10 +2629,14 @@ watch(() => song.value, (newSong, oldSong) => {
   padding: 2px;
   border-radius: 4px;
   border: 1px solid #e2e8f0;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .preview-beat-block {
-  width: 24px;
+  flex: 1 1 0;
+  min-width: 12px;
+  max-width: 24px;
   height: 24px;
   border-radius: 3px;
   background: #edf2f7;
