@@ -15,10 +15,10 @@ function generateShareId() {
 }
 
 /**
- * Create a public share for a song. Requires auth.
- * @param {Object} song - Song object (id, title, bpm, timeSignature, sections, instruments, etc.)
+ * Create or update a public share for a song. Reuses existing shareId if the song already has one (stable link).
+ * @param {Object} song - Song object (id, title, bpm, timeSignature, sections, instruments, metadata, etc.)
  * @param {string|null} selectedInstrument - Instrument filter to apply in the public preview (current UI selection)
- * @returns {Promise<{ success: boolean, shareId?: string, error?: string }>}
+ * @returns {Promise<{ success: boolean, shareId?: string, isNew?: boolean, error?: string }>}
  */
 export async function createShare(song, selectedInstrument = null) {
   const { user } = useAuth()
@@ -30,9 +30,7 @@ export async function createShare(song, selectedInstrument = null) {
   }
 
   try {
-    // Store only the fields needed for preview (no userId, no server timestamps)
     const { id, userId, createdAt, updatedAt, ...rest } = song
-    const shareId = generateShareId()
     const metadata = { ...(rest.metadata || {}) }
     if (selectedInstrument != null && selectedInstrument !== '') {
       metadata.selectedInstrument = selectedInstrument
@@ -43,9 +41,18 @@ export async function createShare(song, selectedInstrument = null) {
       sharedBy: user.value.uid,
       sharedAt: new Date().toISOString()
     }
+
+    const existingShareId = song.metadata?.shareId
+    if (existingShareId && typeof existingShareId === 'string' && existingShareId.trim() !== '') {
+      const ref = doc(db, SHARED_COLLECTION, existingShareId.trim())
+      await setDoc(ref, payload)
+      return { success: true, shareId: existingShareId.trim(), isNew: false }
+    }
+
+    const shareId = generateShareId()
     const ref = doc(db, SHARED_COLLECTION, shareId)
     await setDoc(ref, payload)
-    return { success: true, shareId }
+    return { success: true, shareId, isNew: true }
   } catch (e) {
     console.error('createShare error:', e)
     return { success: false, error: e.message }

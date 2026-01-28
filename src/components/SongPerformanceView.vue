@@ -501,7 +501,9 @@ import { createShare } from '../composables/useSharedSongs'
 
 const props = defineProps({
   publicPreview: { type: Boolean, default: false },
-  sharedSong: { type: Object, default: null }
+  sharedSong: { type: Object, default: null },
+  /** Instrument filter from URL (?instrument=Guitar). Takes precedence over metadata.selectedInstrument in public preview. */
+  previewInstrument: { type: String, default: '' }
 })
 
 const KEY_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -553,10 +555,20 @@ const previewVisibleInstruments = computed(() => {
   if (!previewSong.value) return []
   if (props.publicPreview) {
     const instruments = previewSong.value.instruments || ['Drums', 'Bass', 'Guitar', 'Keys']
-    const sharedInstrument = previewSong.value.metadata?.selectedInstrument
-    if (sharedInstrument && instruments.includes(sharedInstrument)) {
-      return [sharedInstrument]
+    const fromUrl = (props.previewInstrument || '').trim()
+    const fromMetadata = previewSong.value.metadata?.selectedInstrument
+    
+    // If URL has instrument param, use it (takes precedence)
+    if (fromUrl && instruments.includes(fromUrl)) {
+      return [fromUrl]
     }
+    
+    // If no URL param but song has selectedInstrument in metadata, use that
+    if (fromMetadata && instruments.includes(fromMetadata)) {
+      return [fromMetadata]
+    }
+    
+    // Otherwise show all instruments
     return instruments
   }
   return visibleInstruments.value
@@ -618,12 +630,20 @@ const openShareDialog = async () => {
   shareLinkCopied.value = false
   try {
     const selectedInstrumentToShare = selectedInstrument.value ?? song.value.metadata?.selectedInstrument
-    const { success, shareId, error } = await createShare(song.value, selectedInstrumentToShare)
+    const { success, shareId, isNew, error } = await createShare(song.value, selectedInstrumentToShare)
     if (!success || !shareId) {
       alert(error || 'Could not create share link')
       return
     }
-    shareLink.value = `${window.location.origin}/p/${shareId}`
+    if (isNew) {
+      if (!song.value.metadata) song.value.metadata = {}
+      song.value.metadata.shareId = shareId
+      await updateSong(song.value.id, { metadata: { ...song.value.metadata } })
+    }
+    const base = `${window.location.origin}/p/${shareId}`
+    shareLink.value = selectedInstrumentToShare
+      ? `${base}?instrument=${encodeURIComponent(selectedInstrumentToShare)}`
+      : base
     showShareDialog.value = true
     shareToUserId.value = ''
     shareToUserMessage.value = ''

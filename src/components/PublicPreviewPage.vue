@@ -8,7 +8,7 @@
       <p>{{ error }}</p>
       <router-link to="/" class="btn-home">Go to app</router-link>
     </div>
-    <SongPerformanceView v-else-if="sharedSong" :public-preview="true" :shared-song="sharedSong" />
+    <SongPerformanceView v-else-if="sharedSong" :public-preview="true" :shared-song="sharedSong" :preview-instrument="route.query.instrument || ''" />
   </div>
 </template>
 
