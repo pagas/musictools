@@ -2976,76 +2976,14 @@ watch(() => song.value, (newSong, oldSong) => {
     border-radius: 10px;
   }
 
-  /* Preview: vertical strip + sections in one row on mobile */
+  /* Preview: hide strip on mobile, sections take full width */
   .preview-body {
-    flex-direction: row;
+    flex-direction: column;
     min-width: 0;
   }
 
   .preview-song-strip {
-    flex-direction: column;
-    flex: 0 0 auto;
-    width: 72px;
-    min-width: 72px;
-    max-width: 72px;
-    min-height: 0;
-    height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 6px 16px 6px 4px;
-    position: relative;
-    top: 0;
-  }
-
-  .preview-strip-segment {
-    flex: none;
-    min-height: 52px;
-    min-width: 0;
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-    padding: 4px 0;
-  }
-
-  .preview-strip-segment:last-child {
-    border-bottom: none;
-  }
-
-  .preview-strip-section-header {
-    margin-bottom: 4px;
-  }
-
-  .preview-strip-name {
-    font-size: 0.6rem;
-    line-height: 1.2;
-    text-align: center;
-    display: block;
-  }
-
-  .preview-strip-bars {
-    font-size: 0.55rem;
-  }
-
-  .preview-strip-bars-container {
-    min-height: 20px;
-    flex-direction: row;
-  }
-
-  .preview-strip-bars-container.preview-strip-bars-vertical {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    min-height: 0;
-  }
-
-  .preview-strip-bars-container.preview-strip-bars-vertical .preview-strip-bar-segment {
-    flex: 1 1 auto;
-    min-height: 4px;
-  }
-
-  .preview-strip-bars-container.preview-strip-bars-vertical .preview-strip-phase-marker {
-    width: 100%;
-    height: 1px;
+    display: none;
   }
 
   .preview-sections-container {
