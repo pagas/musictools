@@ -46,18 +46,11 @@ onAuthStateChanged(auth, async (firebaseUser) => {
             await updateDoc(userDocRef, updates)
           }
         }
-      } else {
-        // Create user document if it doesn't exist
-        // Verify user still matches before creating
-        if (user.value?.uid === firebaseUser.uid) {
-          await setDoc(userDocRef, {
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || null,
-            role: 'user',
-            createdAt: new Date().toISOString()
-          })
-        }
       }
+      // Note: We do NOT create user documents here on login.
+      // User documents should only be created by:
+      // 1. Admin via Cloud Function (createUser)
+      // 2. User signup via signUpWithEmail (which already creates it)
     } catch (error) {
       // Ignore errors if user changed during operation
       if (user.value?.uid === firebaseUser.uid) {
