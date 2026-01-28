@@ -11,7 +11,7 @@ admin.initializeApp()
  * @param {Object} context - Firebase callable function context
  * @returns {Object} { success: true, uid: string, email: string }
  */
-exports.createUser = functions.https.onCall(async (data, context) => {
+exports.createUser = functions.region('us-central1').https.onCall(async (data, context) => {
   // Verify the user is authenticated
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -99,7 +99,7 @@ exports.createUser = functions.https.onCall(async (data, context) => {
  * @param {Object} context - Firebase callable function context
  * @returns {Object} { success: true, newSongId: string }
  */
-exports.copySongToUser = functions.https.onCall(async (data, context) => {
+exports.copySongToUser = functions.region('us-central1').https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       'unauthenticated',
