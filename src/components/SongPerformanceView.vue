@@ -1562,6 +1562,11 @@ const openPreview = () => {
   }
 }
 
+/** Used in public preview mode when user clicks close (e.g. not logged in). */
+const goToHome = () => {
+  router.push({ path: '/' })
+}
+
 const closePreview = () => {
   if (selectedSongId.value) {
     router.push({ 
