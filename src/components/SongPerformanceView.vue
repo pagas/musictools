@@ -30,7 +30,7 @@
       >
         <div class="preview-strip-section-header">
           <span class="preview-strip-name">{{ section.name }}</span>
-          <span class="preview-strip-bars">{{ section.bars }} bars</span>
+          <span class="preview-strip-bars">{{ formatBarsAsPhrasesAbbr(section.bars, previewSong.timeSignature) }}</span>
         </div>
         <div class="preview-strip-bars-container" :class="{ 'preview-strip-bars-vertical': section.bars > 2 }">
           <template v-for="bar in Array.from({ length: section.bars }, (_, i) => i + 1)" :key="bar">
@@ -58,13 +58,14 @@
             <div class="preview-instrument-header">
               <h3 class="preview-section-name" v-if="inst === previewVisibleInstruments[0]">{{ section.name }}</h3>
               <div class="preview-section-meta" v-if="inst === previewVisibleInstruments[0]">
-                <span>{{ section.bars }} bars</span>
+                <span>{{ formatBarsAsPhrases(section.bars, previewSong.timeSignature) }}</span>
                 <span v-if="section.instructions" class="preview-instructions">{{ section.instructions }}</span>
               </div>
               <div class="preview-instrument-name" v-if="previewVisibleInstruments.length > 1">{{ inst }}</div>
             </div>
             <div class="preview-pattern-map">
               <div v-for="(row, rowIndex) in getBarRows(section.bars)" :key="rowIndex" class="preview-bar-row">
+                <span class="preview-bar-row-number">{{ rowIndex + 1 }}</span>
                 <div v-for="bar in row" :key="bar" class="preview-bar-container">
                   <div class="preview-bar-beats">
                     <div v-for="beat in getVisibleBeats(section, bar)" :key="beat" class="preview-beat-block"
@@ -674,6 +675,30 @@ const barsPerPhrase = computed(() => {
   const [beats] = (s.timeSignature || '4/4').split('/').map(Number)
   return beats || 4
 })
+
+// Format bar count as "N phrases" or "N phrases + M" (e.g. 4/4: 4 bars per phrase → 8 bars = 2 phrases, 16 bars = 4 phrases)
+const formatBarsAsPhrases = (bars, timeSignature) => {
+  if (bars == null || bars < 1) return '0 phrases'
+  const beats = (timeSignature || '4/4').split('/').map(Number)[0] || 4
+  const barsPerPhraseDisplay = Math.max(1, beats)
+  const fullPhrases = Math.floor(bars / barsPerPhraseDisplay)
+  const extraBars = bars % barsPerPhraseDisplay
+  if (fullPhrases === 0) return `${extraBars} bar${extraBars !== 1 ? 's' : ''}`
+  if (extraBars === 0) return `${fullPhrases} phrase${fullPhrases !== 1 ? 's' : ''}`
+  return `${fullPhrases} phrase${fullPhrases !== 1 ? 's' : ''} + ${extraBars}`
+}
+
+// Abbreviated form for strip: "2 phr", "3 phr + 1", "1 bar"
+const formatBarsAsPhrasesAbbr = (bars, timeSignature) => {
+  if (bars == null || bars < 1) return '0 phr'
+  const beats = (timeSignature || '4/4').split('/').map(Number)[0] || 4
+  const barsPerPhraseDisplay = Math.max(1, beats)
+  const fullPhrases = Math.floor(bars / barsPerPhraseDisplay)
+  const extraBars = bars % barsPerPhraseDisplay
+  if (fullPhrases === 0) return `${extraBars} bar${extraBars !== 1 ? 's' : ''}`
+  if (extraBars === 0) return `${fullPhrases} phr`
+  return `${fullPhrases} phr + ${extraBars}`
+}
 
 // Group bars into rows based on time signature
 const getBarRows = (totalBars) => {
@@ -2572,8 +2597,22 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .preview-bar-row {
   display: flex;
+  align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+}
+
+.preview-bar-row-number {
+  flex-shrink: 0;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9f9f9f;
+  user-select: none;
 }
 
 .preview-bar-container {
