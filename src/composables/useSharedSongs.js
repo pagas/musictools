@@ -74,6 +74,7 @@ export async function getSharedSong(shareId) {
       bpm: data.bpm ?? 120,
       timeSignature: data.timeSignature ?? '4/4',
       key: data.key ?? 'C',
+      chords: Array.isArray(data.chords) ? data.chords : [],
       instruments: data.instruments ?? ['Drums', 'Bass', 'Guitar', 'Keys'],
       sections: data.sections ?? [],
       metadata: data.metadata ?? {}

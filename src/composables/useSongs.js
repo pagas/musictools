@@ -49,11 +49,25 @@ export function useSongs() {
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          songs.value = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          loading.value = false
+          // Small delay to avoid race conditions with concurrent updates
+          setTimeout(() => {
+            try {
+              songs.value = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }))
+              loading.value = false
+            } catch (error) {
+              // Catch Firestore internal assertion errors and ignore them
+              if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
+                console.warn('Firestore internal assertion error caught in listener, ignoring:', error)
+                // Don't update songs.value to avoid corruption
+                return
+              }
+              console.error('Error processing snapshot:', error)
+              loading.value = false
+            }
+          }, 0)
         },
         (error) => {
           console.error('Error loading songs:', error)
@@ -73,16 +87,29 @@ export function useSongs() {
             unsubscribe = onSnapshot(
               qSimple,
               (snapshot) => {
-                songs.value = snapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })).sort((a, b) => {
-                  // Sort by createdAt if available, otherwise by id
-                  const aTime = a.createdAt?.toMillis?.() || 0
-                  const bTime = b.createdAt?.toMillis?.() || 0
-                  return bTime - aTime
-                })
-                loading.value = false
+                // Small delay to avoid race conditions with concurrent updates
+                setTimeout(() => {
+                  try {
+                    songs.value = snapshot.docs.map(doc => ({
+                      id: doc.id,
+                      ...doc.data()
+                    })).sort((a, b) => {
+                      // Sort by createdAt if available, otherwise by id
+                      const aTime = a.createdAt?.toMillis?.() || 0
+                      const bTime = b.createdAt?.toMillis?.() || 0
+                      return bTime - aTime
+                    })
+                    loading.value = false
+                  } catch (error) {
+                    // Catch Firestore internal assertion errors and ignore them
+                    if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
+                      console.warn('Firestore internal assertion error caught in fallback listener, ignoring:', error)
+                      return
+                    }
+                    console.error('Error processing fallback snapshot:', error)
+                    loading.value = false
+                  }
+                }, 0)
               },
               (err) => {
                 console.error('Error loading songs (fallback):', err)
@@ -152,6 +179,22 @@ export function useSongs() {
       return { success: true }
     } catch (error) {
       console.error('Error updating song:', error)
+      // Check if it's a Firestore internal assertion error
+      if (error.message && error.message.includes('INTERNAL ASSERTION FAILED')) {
+        // These are usually transient errors - try once more after a short delay
+        console.warn('Firestore assertion error, retrying after delay...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        try {
+          const songRef = doc(db, 'songs', songId)
+          await updateDoc(songRef, {
+            ...updates,
+            updatedAt: serverTimestamp()
+          })
+          return { success: true }
+        } catch (retryError) {
+          return { success: false, error: 'Failed to save after retry. Please try again.' }
+        }
+      }
       return { success: false, error: error.message }
     }
   }

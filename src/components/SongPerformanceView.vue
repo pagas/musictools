@@ -9,6 +9,7 @@
           <span>BPM: {{ previewSong.bpm }}</span>
           <span>Time: {{ previewSong.timeSignature }}</span>
           <span v-if="previewSong.key">Key: {{ previewSong.key }}</span>
+          <span>Chords: {{ (previewSong.chords || []).length ? (previewSong.chords || []).join(' ') : '—' }}</span>
         </div>
       </div>
       <div class="preview-header-actions">
@@ -147,6 +148,38 @@
     </div>
   </Teleport>
 
+  <!-- Chords Dialog -->
+  <Teleport to="body">
+    <div v-if="showChordsDialog" class="share-dialog-overlay chords-dialog-overlay" @click="closeChordsDialog">
+      <div class="share-dialog chords-dialog" @click.stop>
+        <div class="share-dialog-header">
+          <h3>Chord progression</h3>
+          <button class="share-dialog-close" @click="closeChordsDialog" title="Close">✕</button>
+        </div>
+        <div class="share-dialog-content">
+          <div class="chords-list-edit">
+            <div v-for="(chord, idx) in (song?.chords || [])" :key="idx" class="chord-row">
+              <select v-model="song.chords[idx]" class="chord-select">
+                <option v-for="note in CHORD_OPTIONS" :key="note" :value="note">{{ note }}</option>
+              </select>
+              <button type="button" class="chord-remove" @click="removeChord(idx)" title="Remove">×</button>
+            </div>
+          </div>
+          <div class="chords-dialog-actions">
+            <select v-model="chordToAdd" class="chord-select">
+              <option value="">Add chord...</option>
+              <option v-for="note in CHORD_OPTIONS" :key="note" :value="note">{{ note }}</option>
+            </select>
+            <button type="button" class="btn-add-chord" @click="addChord" :disabled="!chordToAdd">Add</button>
+          </div>
+          <div class="chords-dialog-footer">
+            <button type="button" class="btn-ok-chords" @click="closeChordsDialog">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div v-if="!isShowingPreview" class="performance-view">
     <!-- Song List View -->
     <div v-if="showSongList" class="song-list-view">
@@ -245,6 +278,10 @@
                       {{ note }}
                     </option>
                   </select>
+                </span>
+                <span class="chords-meta" @click="openChordsDialog" title="Edit chord progression">
+                  <span class="label">Chords:</span>
+                  <span class="chords-preview">{{ chordsPreview }}</span>
                 </span>
               </div>
             </div>
@@ -434,6 +471,8 @@ const props = defineProps({
 })
 
 const KEY_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+// Major (root only) and minor (root + m) for each note
+const CHORD_OPTIONS = KEY_OPTIONS.flatMap(note => [note, note + 'm'])
 
 const router = useRouter()
 const route = useRoute()
@@ -449,6 +488,7 @@ const createDefaultSong = () => ({
   bpm: 120,
   timeSignature: '4/4',
   key: 'C',
+  chords: [],
   instruments: ['Drums', 'Bass', 'Guitar', 'Keys'],
   sections: [
     {
@@ -487,6 +527,17 @@ const previewVisibleInstruments = computed(() => {
   }
   return visibleInstruments.value
 })
+
+const chordsPreview = computed(() => {
+  if (!song.value) return '—'
+  const chords = song.value.chords
+  if (!chords || !Array.isArray(chords) || chords.length === 0) return '—'
+  return chords.join(' ')
+})
+
+// Chords dialog state
+const showChordsDialog = ref(false)
+const chordToAdd = ref('')
 
 // Share link state
 const shareLoading = ref(false)
@@ -569,8 +620,27 @@ const copySongToUserFromDialog = async () => {
   }
 }
 
-const goToHome = () => {
-  router.push('/')
+const openChordsDialog = () => {
+  if (!song.value) return
+  if (!Array.isArray(song.value.chords)) song.value.chords = []
+  chordToAdd.value = ''
+  showChordsDialog.value = true
+}
+
+const closeChordsDialog = () => {
+  showChordsDialog.value = false
+}
+
+const addChord = () => {
+  if (!song.value || !chordToAdd.value) return
+  if (!Array.isArray(song.value.chords)) song.value.chords = []
+  song.value.chords.push(chordToAdd.value)
+  chordToAdd.value = ''
+}
+
+const removeChord = (idx) => {
+  if (!song.value?.chords) return
+  song.value.chords.splice(idx, 1)
 }
 
 // Bar menu state
@@ -594,6 +664,11 @@ const manualSave = async () => {
   lastSaved.value = false
 
   try {
+    // Ensure chords is an array before saving
+    if (!Array.isArray(song.value.chords)) {
+      song.value.chords = []
+    }
+    
     // Remove metadata fields before saving
     const { id, userId, createdAt, updatedAt, ...dataToSave } = song.value
     const result = await updateSong(selectedSongId.value, dataToSave)
@@ -1464,6 +1539,11 @@ watch(() => song.value, (newSong, oldSong) => {
       newSong.key = 'C'
     }
 
+    // Ensure chords array exists
+    if (!Array.isArray(newSong.chords)) {
+      newSong.chords = []
+    }
+
     // Song loaded, mark as initialized after a brief delay
     setTimeout(() => {
       if (song.value && selectedSongId.value) {
@@ -1758,7 +1838,8 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .bpm,
 .time-sig,
-.key {
+.key,
+.chords-meta {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1766,6 +1847,20 @@ watch(() => song.value, (newSong, oldSong) => {
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.chords-meta {
+  cursor: pointer;
+  user-select: none;
+}
+
+.chords-meta:hover {
+  background: #eef2ff;
+}
+
+.chords-preview {
+  color: #667eea;
   font-weight: 600;
 }
 
@@ -2691,6 +2786,108 @@ watch(() => song.value, (newSong, oldSong) => {
   color: #dc3545;
 }
 
+/* Chords dialog */
+.chords-list-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chord-row .chord-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.chord-remove {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 6px;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.chord-remove:hover {
+  background: #fecaca;
+}
+
+.chords-dialog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chords-dialog-actions .chord-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.btn-add-chord {
+  padding: 8px 16px;
+  border: 1px solid #667eea;
+  background: #667eea;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-add-chord:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.btn-add-chord:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chords-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 16px;
+}
+
+.btn-ok-chords {
+  padding: 10px 24px;
+  border: 1px solid #667eea;
+  background: #667eea;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-ok-chords:hover {
+  background: #5568d3;
+}
+
 .btn-close {
   width: 40px;
   height: 40px;
@@ -3045,7 +3242,8 @@ watch(() => song.value, (newSong, oldSong) => {
 
   .bpm,
   .time-sig,
-  .key {
+  .key,
+  .chords-meta {
     padding: 6px 10px;
     min-height: 40px;
     font-size: 0.8125rem;
