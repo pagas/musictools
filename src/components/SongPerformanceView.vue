@@ -4,7 +4,7 @@
     <div v-if="isShowingPreview" class="preview-view">
     <div class="preview-header">
       <div class="preview-title">
-        <h2>{{ previewSong.title }}</h2>
+        <h2>{{ previewSong.title }}<span v-if="previewSelectedInstrumentLabel" class="preview-instrument-label"> · {{ previewSelectedInstrumentLabel }}</span></h2>
         <div class="preview-meta">
           <span>BPM: {{ previewSong.bpm }}</span>
           <span>Time: {{ previewSong.timeSignature }}</span>
@@ -96,6 +96,13 @@
           <button class="share-dialog-close" @click="closeShareDialog" title="Close">✕</button>
         </div>
         <div class="share-dialog-content">
+          <div v-if="song" class="share-dialog-instrument">
+            <label class="share-dialog-label">Instrument shown in link:</label>
+            <select v-model="shareDialogInstrument" class="share-dialog-instrument-select">
+              <option value="">All</option>
+              <option v-for="inst in (song?.instruments || [])" :key="inst" :value="inst">{{ inst }}</option>
+            </select>
+          </div>
           <label class="share-dialog-label">Share Link:</label>
           <div class="share-link-container">
             <input 
@@ -574,6 +581,15 @@ const previewVisibleInstruments = computed(() => {
   return visibleInstruments.value
 })
 
+/** Label for the currently selected instrument in preview (single name or "All") */
+const previewSelectedInstrumentLabel = computed(() => {
+  if (!isShowingPreview.value) return ''
+  const list = previewVisibleInstruments.value
+  if (!list || list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return 'All'
+})
+
 const chordsPreview = computed(() => {
   if (!song.value) return '—'
   const chords = song.value.chords
@@ -617,6 +633,8 @@ const shareLoading = ref(false)
 const shareLinkCopied = ref(false)
 const showShareDialog = ref(false)
 const shareLink = ref('')
+const shareBaseUrl = ref('')
+const shareDialogInstrument = ref('')
 const shareLinkInputRef = ref(null)
 const shareToUserId = ref('')
 const shareToUserLoading = ref(false)
@@ -624,13 +642,20 @@ const shareToUserMessage = ref('')
 const shareToUserMessageSuccess = ref(false)
 let shareCopiedTimeout = null
 
+watch(shareDialogInstrument, () => {
+  if (!shareBaseUrl.value) return
+  shareLink.value = shareDialogInstrument.value
+    ? `${shareBaseUrl.value}?instrument=${encodeURIComponent(shareDialogInstrument.value)}`
+    : shareBaseUrl.value
+})
+
 const openShareDialog = async () => {
   if (!song.value || shareLoading.value) return
   shareLoading.value = true
   shareLinkCopied.value = false
   try {
-    const selectedInstrumentToShare = selectedInstrument.value ?? song.value.metadata?.selectedInstrument
-    const { success, shareId, isNew, error } = await createShare(song.value, selectedInstrumentToShare)
+    const selectedInstrumentToShare = selectedInstrument.value ?? song.value.metadata?.selectedInstrument ?? ''
+    const { success, shareId, isNew, error } = await createShare(song.value, selectedInstrumentToShare || null)
     if (!success || !shareId) {
       alert(error || 'Could not create share link')
       return
@@ -641,8 +666,10 @@ const openShareDialog = async () => {
       await updateSong(song.value.id, { metadata: { ...song.value.metadata } })
     }
     const base = `${window.location.origin}/p/${shareId}`
-    shareLink.value = selectedInstrumentToShare
-      ? `${base}?instrument=${encodeURIComponent(selectedInstrumentToShare)}`
+    shareBaseUrl.value = base
+    shareDialogInstrument.value = selectedInstrumentToShare || ''
+    shareLink.value = shareDialogInstrument.value
+      ? `${base}?instrument=${encodeURIComponent(shareDialogInstrument.value)}`
       : base
     showShareDialog.value = true
     shareToUserId.value = ''
@@ -660,6 +687,8 @@ const openShareDialog = async () => {
 const closeShareDialog = () => {
   showShareDialog.value = false
   shareLinkCopied.value = false
+  shareBaseUrl.value = ''
+  shareDialogInstrument.value = ''
   shareToUserId.value = ''
   shareToUserMessage.value = ''
   if (shareCopiedTimeout) {
@@ -2773,6 +2802,12 @@ watch(() => song.value, (newSong, oldSong) => {
   color: #333;
 }
 
+.preview-instrument-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 0.75em;
+}
+
 .preview-meta {
   display: flex;
   gap: 12px;
@@ -2887,6 +2922,22 @@ watch(() => song.value, (newSong, oldSong) => {
 
 .share-dialog-content {
   padding: 24px;
+}
+
+.share-dialog-instrument {
+  margin-bottom: 16px;
+}
+
+.share-dialog-instrument-select {
+  width: 100%;
+  max-width: 240px;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+  color: #333;
+  cursor: pointer;
 }
 
 .share-dialog-label {
