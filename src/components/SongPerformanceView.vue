@@ -173,21 +173,8 @@
               </div>
             </div>
 
-            <!-- Instrument Filter -->
+            <!-- Instrument Manager (add/remove instruments) -->
             <div class="instrument-filter" v-if="song">
-              <div class="instrument-list">
-                <button class="filter-btn" :class="{ active: selectedInstrument === null }"
-                  @click="selectedInstrument = null">
-                  All
-                </button>
-                <span v-for="inst in song.instruments || []" :key="inst" class="instrument-tag"
-                  :class="{ active: selectedInstrument === inst }" @click="selectedInstrument = inst">
-                  {{ inst }}
-                  <button class="instrument-remove" @click.stop="removeInstrument(inst)" title="Remove instrument">
-                    ×
-                  </button>
-                </span>
-              </div>
               <div class="instrument-manager">
                 <div class="instrument-dropdown-wrapper">
                   <select v-model="newInstrumentName" class="instrument-select" @change="addInstrument">
@@ -216,6 +203,19 @@
       <!-- Sticky Header with Actions and Song Strip -->
       <div class="sticky-header-container" v-if="song">
         <div class="header-actions">
+          <div class="instrument-list">
+            <button class="filter-btn" :class="{ active: selectedInstrument === null }"
+              @click="selectedInstrument = null">
+              All
+            </button>
+            <span v-for="inst in song.instruments || []" :key="inst" class="instrument-tag"
+              :class="{ active: selectedInstrument === inst }" @click="selectedInstrument = inst">
+              {{ inst }}
+              <button class="instrument-remove" @click.stop="removeInstrument(inst)" title="Remove instrument">
+                ×
+              </button>
+            </span>
+          </div>
           <button class="btn-save" @click="manualSave" :disabled="saving || !song"
             :title="saving ? 'Saving...' : 'Save Song'">
             <span v-if="saving">💾 Saving...</span>
@@ -1825,6 +1825,10 @@ watch(() => song.value, (newSong, oldSong) => {
   padding: 12px 24px;
   background: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.header-actions .instrument-list {
+  margin-right: auto;
 }
 
 /* Song Strip */
