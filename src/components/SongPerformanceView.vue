@@ -230,6 +230,43 @@
     </div>
   </Teleport>
 
+  <!-- Assign Music Dialog -->
+  <Teleport to="body">
+    <div v-if="showAssignMusicDialog" class="share-dialog-overlay assign-music-dialog-overlay" @click="closeAssignMusicDialog">
+      <div class="share-dialog assign-music-dialog" @click.stop>
+        <div class="share-dialog-header">
+          <h3>Assign Music from Library</h3>
+          <button class="share-dialog-close" @click="closeAssignMusicDialog" title="Close">✕</button>
+        </div>
+        <div class="share-dialog-content">
+          <div v-if="song?.libraryAudio" class="assign-music-current">
+            <span class="assign-music-label">Current:</span>
+            <span class="assign-music-name">{{ song.libraryAudio.name }}</span>
+            <button type="button" class="btn-clear-music" @click="clearAssignedMusic" title="Remove assigned music">Clear</button>
+          </div>
+          <label class="share-dialog-label">Select a file from your Music Library:</label>
+          <div v-if="libraryFilesLoading" class="assign-music-loading">Loading...</div>
+          <div v-else-if="libraryFiles.length === 0" class="assign-music-empty">
+            No files in your Music Library. Upload audio files from the main app first.
+          </div>
+          <div v-else class="assign-music-list">
+            <button
+              v-for="item in libraryFiles"
+              :key="item.id"
+              type="button"
+              class="assign-music-item"
+              :class="{ active: song?.libraryAudio?.id === item.id }"
+              @click="selectLibraryFile(item)"
+            >
+              <span class="assign-music-item-name">{{ item.name }}</span>
+              <span class="assign-music-item-meta">{{ formatLibraryFileSize(item.size) }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div v-if="!isShowingPreview" class="performance-view">
     <!-- Song List View -->
     <div v-if="showSongList" class="song-list-view">
@@ -287,6 +324,8 @@
               ← Back
             </button>
             <div v-if="song" class="header-dropdown-wrapper" ref="headerDropdownRef">
+              <PlayPauseButton v-if="song?.libraryAudio" :playing="headerMusicPlaying"
+                @click="toggleHeaderMusicPlay" />
               <button type="button" class="btn-dropdown-trigger" :class="{ open: showHeaderDropdown }"
                 @click.stop="showHeaderDropdown = !showHeaderDropdown" title="Actions">
                 Actions ▾
@@ -295,6 +334,10 @@
                 <div v-if="showHeaderDropdown" class="header-dropdown-menu" @click.stop>
                   <button type="button" class="header-dropdown-item" @click="onHeaderDropdownInstruments">
                     Instruments
+                  </button>
+                  <button type="button" class="header-dropdown-item" @click="onHeaderDropdownAssignMusic"
+                    v-if="isAuthenticated()">
+                    Assign Music
                   </button>
                   <button type="button" class="header-dropdown-item" @click="onHeaderDropdownShare"
                     :disabled="shareLoading">
@@ -507,7 +550,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useSongs } from '../composables/useSongs'
 import { useAuth } from '../composables/useAuth'
 import { useAdmin } from '../composables/useAdmin'
+import { useAudioFiles } from '../composables/useAudioFiles'
 import { createShare } from '../composables/useSharedSongs'
+import PlayPauseButton from './ui/PlayPauseButton.vue'
 
 const props = defineProps({
   publicPreview: { type: Boolean, default: false },
@@ -527,6 +572,7 @@ const route = useRoute()
 const { songs, loading: songsLoading, loadSongs, createSong, updateSong, deleteSong: deleteSongFromFirestore } = useSongs()
 const { user, isAuthenticated } = useAuth()
 const { isAdmin, fetchUsers, usersList, loadingUsers, copySongToUser } = useAdmin()
+const { files: libraryFiles, loading: libraryFilesLoading, getDownloadUrl } = useAudioFiles()
 
 // Format Firestore timestamp to readable date
 const formatDate = (timestamp) => {
@@ -655,18 +701,67 @@ const showInstrumentsDialog = ref(false)
 const openInstrumentsDialog = () => { showInstrumentsDialog.value = true }
 const closeInstrumentsDialog = () => { showInstrumentsDialog.value = false }
 
-// Header dropdown (Actions → Instruments / Share)
+// Header dropdown (Actions → Instruments / Share / Assign Music)
 const showHeaderDropdown = ref(false)
 const headerDropdownRef = ref(null)
 const closeHeaderDropdown = () => { showHeaderDropdown.value = false }
+const showAssignMusicDialog = ref(false)
+const openAssignMusicDialog = () => { showAssignMusicDialog.value = true }
+const closeAssignMusicDialog = () => { showAssignMusicDialog.value = false }
 const onHeaderDropdownInstruments = () => {
   closeHeaderDropdown()
   openInstrumentsDialog()
+}
+const onHeaderDropdownAssignMusic = () => {
+  closeHeaderDropdown()
+  openAssignMusicDialog()
 }
 const onHeaderDropdownShare = () => {
   if (shareLoading.value) return
   closeHeaderDropdown()
   openShareDialog()
+}
+
+// Assign Music from Library
+const formatLibraryFileSize = (bytes) => {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+const selectLibraryFile = async (item) => {
+  if (!song.value?.id) return
+  const libraryAudio = {
+    id: item.id,
+    name: item.name,
+    downloadUrl: getDownloadUrl(item) || item.downloadUrl,
+    size: item.size
+  }
+  try {
+    const result = await updateSong(song.value.id, { libraryAudio })
+    if (result.success) {
+      song.value.libraryAudio = libraryAudio
+      closeAssignMusicDialog()
+    } else {
+      alert('Failed to assign music: ' + (result.error || 'Unknown error'))
+    }
+  } catch (e) {
+    alert('Failed to assign music: ' + (e.message || 'Unknown error'))
+  }
+}
+const clearAssignedMusic = async () => {
+  if (!song.value?.id) return
+  try {
+    const result = await updateSong(song.value.id, { libraryAudio: null })
+    if (result.success) {
+      song.value.libraryAudio = null
+      closeAssignMusicDialog()
+    } else {
+      alert('Failed to clear music: ' + (result.error || 'Unknown error'))
+    }
+  } catch (e) {
+    alert('Failed to clear music: ' + (e.message || 'Unknown error'))
+  }
 }
 watch(showHeaderDropdown, (open) => {
   if (!open) return
@@ -868,6 +963,45 @@ const song = computed({
     if (index !== -1) {
       songs.value[index] = value
     }
+  }
+})
+
+// Header play button for assigned music (must be after song is defined)
+const headerMusicPlaying = ref(false)
+let headerMusicAudio = null
+const toggleHeaderMusicPlay = () => {
+  const url = song.value?.libraryAudio?.downloadUrl
+  if (!url) return
+  if (headerMusicPlaying.value) {
+    if (headerMusicAudio) {
+      headerMusicAudio.pause()
+      headerMusicAudio.currentTime = 0
+    }
+    headerMusicPlaying.value = false
+    return
+  }
+  if (headerMusicAudio) {
+    headerMusicAudio.src = url
+  } else {
+    headerMusicAudio = new Audio(url)
+    headerMusicAudio.addEventListener('ended', () => { headerMusicPlaying.value = false })
+    headerMusicAudio.addEventListener('pause', () => { headerMusicPlaying.value = false })
+    headerMusicAudio.addEventListener('play', () => { headerMusicPlaying.value = true })
+  }
+  headerMusicAudio.play().catch(() => { headerMusicPlaying.value = false })
+}
+watch(() => song.value?.libraryAudio?.downloadUrl, () => {
+  if (headerMusicAudio) {
+    headerMusicAudio.pause()
+    headerMusicAudio = null
+  }
+  headerMusicPlaying.value = false
+})
+watch(showSongList, (isList) => {
+  if (isList && headerMusicAudio) {
+    headerMusicAudio.pause()
+    headerMusicAudio.currentTime = 0
+    headerMusicPlaying.value = false
   }
 })
 
@@ -1759,6 +1893,9 @@ watch(() => song.value, (newSong, oldSong) => {
 .header-dropdown-wrapper {
   position: relative;
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-dropdown-trigger {
@@ -2264,8 +2401,104 @@ watch(() => song.value, (newSong, oldSong) => {
   display: flex;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid #e0e0e0;
-  margin-top: 16px;
+}
+
+/* Assign Music Dialog */
+.assign-music-dialog .share-dialog-content {
+  min-width: 360px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.assign-music-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #f0f4ff;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.assign-music-label {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.assign-music-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-clear-music {
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  background: transparent;
+  color: #c53030;
+  border: 1px solid #c53030;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear-music:hover {
+  background: #c53030;
+  color: white;
+}
+
+.assign-music-loading,
+.assign-music-empty {
+  padding: 24px;
+  text-align: center;
+  color: #718096;
+}
+
+.assign-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.assign-music-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  text-align: left;
+  background: #f8f9fa;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.assign-music-item:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.assign-music-item.active {
+  background: #eef2ff;
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.assign-music-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.assign-music-item-meta {
+  font-size: 0.8rem;
+  color: #718096;
+  margin-left: 8px;
 }
 
 .btn-ok-instruments {

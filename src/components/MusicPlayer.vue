@@ -7,14 +7,7 @@
     <div class="player-controls">
       <div class="controls-layout">
         <div class="volume-play-wrapper">
-          <button class="play-btn" @click="togglePlayPause">
-            <svg v-if="!isPlaying" class="play-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            <svg v-else class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-            </svg>
-          </button>
+          <PlayPauseButton :playing="isPlaying" @click="togglePlayPause" />
           <button class="seek-btn seek-start-btn" @click="seekToStart" :disabled="!duration || duration === 0"
             title="Go to Start">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -79,6 +72,7 @@ import createPitchShifter from 'soundbank-pitch-shift'
 import PlaybackControls from './PlaybackControls.vue'
 import NoteDetector from './NoteDetector.vue'
 import VolumeControl from './VolumeControl.vue'
+import PlayPauseButton from './ui/PlayPauseButton.vue'
 import SpeedControls from './SpeedControls.vue'
 import PitchControls from './PitchControls.vue'
 import WaveformViewer from './WaveformViewer.vue'
@@ -528,53 +522,15 @@ onMounted(() => {
     gap: 8px;
   }
 
-  .play-btn,
   .seek-btn {
     width: 36px;
     height: 36px;
-  }
-
-  .play-btn .play-icon,
-  .play-btn .pause-icon {
-    width: 20px;
-    height: 20px;
   }
 
   .seek-btn svg {
     width: 18px;
     height: 18px;
   }
-}
-
-.play-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
-  flex-shrink: 0;
-}
-
-.play-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.6);
-}
-
-.play-btn:active {
-  transform: scale(0.95);
-}
-
-.play-btn .play-icon,
-.play-btn .pause-icon {
-  width: 24px;
-  height: 24px;
-  color: white;
 }
 
 .seek-btn {
