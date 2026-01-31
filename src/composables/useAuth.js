@@ -3,7 +3,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  updateProfile
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase/config'
@@ -137,6 +138,39 @@ export function useAuth() {
     }
   }
 
+  // Update user profile (displayName, photoURL)
+  const updateUserProfile = async ({ displayName, photoURL }) => {
+    if (!auth.currentUser) {
+      return { success: false, error: 'No user logged in' }
+    }
+    try {
+      const updates = {}
+      if (displayName !== undefined) updates.displayName = displayName || null
+      if (photoURL !== undefined) updates.photoURL = photoURL || null
+      
+      if (Object.keys(updates).length === 0) {
+        return { success: true, user: auth.currentUser }
+      }
+
+      await updateProfile(auth.currentUser, updates)
+      user.value = auth.currentUser
+
+      // Sync to Firestore users collection (displayName only - email/photoURL managed by Auth)
+      if (updates.displayName !== undefined) {
+        const userDocRef = doc(db, 'users', auth.currentUser.uid)
+        const userDoc = await getDoc(userDocRef)
+        if (userDoc.exists()) {
+          await updateDoc(userDocRef, { displayName: updates.displayName })
+        }
+      }
+
+      return { success: true, user: auth.currentUser }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
   // Sign out
   const logout = async () => {
     try {
@@ -157,6 +191,7 @@ export function useAuth() {
     loading,
     signInWithEmail,
     signUpWithEmail,
+    updateUserProfile,
     logout,
     isAuthenticated: () => !!user.value
   }

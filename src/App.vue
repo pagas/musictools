@@ -20,21 +20,41 @@
           <p class="subtitle">Upload and analyze or slow down your music</p>
         </div>
         <div class="user-info">
-          <div v-if="isAuthenticated" class="user-details">
-            <img 
-              v-if="user?.photoURL" 
-              :src="user.photoURL" 
-              :alt="user.displayName || 'User'"
-              class="user-avatar"
-            />
-            <span class="user-name">
-              {{ user?.displayName || user?.email }}
-              <span v-if="isAdmin" class="admin-badge" title="Administrator">👑</span>
-            </span>
+          <div v-if="isAuthenticated" class="user-dropdown-wrapper" ref="userDropdownRef">
+            <button
+              class="user-dropdown-trigger"
+              @click="userDropdownOpen = !userDropdownOpen"
+              title="Account menu"
+            >
+              <img 
+                v-if="user?.photoURL" 
+                :src="user.photoURL" 
+                :alt="user.displayName || 'User'"
+                class="user-avatar"
+              />
+              <span class="user-name">
+                {{ user?.displayName || user?.email }}
+                <span v-if="isAdmin" class="admin-badge" title="Administrator">👑</span>
+                <span class="dropdown-chevron">▼</span>
+              </span>
+            </button>
+            <transition name="dropdown">
+              <div v-if="userDropdownOpen" class="user-dropdown-menu">
+                <button
+                  class="dropdown-item"
+                  @click="setActiveTab('account'); userDropdownOpen = false"
+                >
+                  ⚙️ Account
+                </button>
+                <button
+                  class="dropdown-item dropdown-item-danger"
+                  @click="handleLogout(); userDropdownOpen = false"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </transition>
           </div>
-          <button v-if="isAuthenticated" class="btn-logout" @click="handleLogout" title="Sign out">
-            Sign Out
-          </button>
           <button v-else class="btn-login" @click="showLoginView = true" title="Sign in">
             Sign In
           </button>
@@ -87,11 +107,11 @@
 
     <main>
       <FileUpload
-        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin'"
+        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account'"
         @file-selected="handleFileSelected"
       />
       
-      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin'" class="file-info">
+      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <button class="btn-change" @click="changeFile">Change File</button>
       </div>
@@ -117,12 +137,16 @@
       <AdminView
         v-if="activeTab === 'admin' && isAuthenticated && isAdmin"
       />
+
+      <AccountView
+        v-if="activeTab === 'account' && isAuthenticated"
+      />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
 import { useAdmin } from './composables/useAdmin'
@@ -132,6 +156,7 @@ import MusicAnalyzer from './components/MusicAnalyzer.vue'
 import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
 import AdminView from './components/AdminView.vue'
+import AccountView from './components/AccountView.vue'
 import LoginView from './components/LoginView.vue'
 import PublicPreviewPage from './components/PublicPreviewPage.vue'
 
@@ -143,6 +168,15 @@ const { isAdmin, initializeUserRole } = useAdmin()
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
 const showLoginView = ref(false)
+const userDropdownOpen = ref(false)
+const userDropdownRef = ref(null)
+
+// Close dropdown when clicking outside
+const handleClickOutside = (event) => {
+  if (userDropdownRef.value && !userDropdownRef.value.contains(event.target)) {
+    userDropdownOpen.value = false
+  }
+}
 
 const isAuthenticated = computed(() => checkAuth())
 
@@ -152,7 +186,8 @@ const routeToTab = {
   'analyzer': 'analyzer',
   'performance': 'performance',
   'multitrack': 'multitrack',
-  'admin': 'admin'
+  'admin': 'admin',
+  'account': 'account'
 }
 
 // Sync activeTab with route
@@ -174,6 +209,8 @@ const setActiveTab = (tab) => {
     router.push('/multitrack')
   } else if (tab === 'admin') {
     router.push('/admin')
+  } else if (tab === 'account') {
+    router.push('/account')
   }
 }
 
@@ -197,6 +234,11 @@ watch(() => route.meta, (meta) => {
   }
 }, { immediate: true })
 
+// Close dropdown when navigating
+watch(activeTab, () => {
+  userDropdownOpen.value = false
+})
+
 // Initialize user role when authenticated
 watch(isAuthenticated, async (authenticated) => {
   if (authenticated && user.value) {
@@ -204,8 +246,10 @@ watch(isAuthenticated, async (authenticated) => {
   }
 }, { immediate: true })
 
-// Handle route protection on mount
+// Handle click outside for dropdown and route protection
 onMounted(async () => {
+  document.addEventListener('click', handleClickOutside)
+  
   if (route.meta?.requiresAuth && !isAuthenticated.value) {
     router.push('/slowdowner')
   } else if (route.meta?.requiresAdmin && (!isAuthenticated.value || !isAdmin.value)) {
@@ -216,6 +260,9 @@ onMounted(async () => {
   if (isAuthenticated.value && user.value) {
     await initializeUserRole()
   }
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 const handleFileSelected = (file) => {
@@ -273,13 +320,91 @@ header h1 {
   gap: 16px;
 }
 
-.user-details {
+.user-dropdown-wrapper {
+  position: relative;
+}
+
+.user-dropdown-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: white;
+  font: inherit;
+  transition: all 0.2s ease;
 }
 
-.user-avatar {
+.user-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  z-index: 100;
+  border: 1px solid #e2e8f0;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.95rem;
+  color: #2d3748;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+  background: #f7fafc;
+}
+
+.dropdown-item-danger {
+  color: #e53e3e;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dropdown-item-danger:hover {
+  background: #fff5f5;
+}
+
+.dropdown-chevron {
+  font-size: 0.6rem;
+  margin-left: 4px;
+  opacity: 0.9;
+  transition: transform 0.2s;
+}
+
+.user-dropdown-trigger:hover .dropdown-chevron {
+  opacity: 1;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.user-dropdown-wrapper .user-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
