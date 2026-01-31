@@ -5,7 +5,7 @@
         ← Back to app
       </button>
       <h1>Music Library</h1>
-      <p class="library-description">Your uploaded audio files. Upload, rename, delete, or use in Slow Downer / Analyzer.</p>
+      <p class="library-description">Your uploaded audio files. Upload, rename, or delete.</p>
       <div class="header-actions">
         <input
           ref="fileInputRef"
@@ -39,23 +39,13 @@
             @keydown.esc="cancelEdit"
           />
           <h3 v-else class="file-name" @click="startEdit(fileItem)">{{ fileItem.name }}</h3>
-          <div class="file-card-actions">
-            <button
-              class="btn-action btn-use"
-              @click="useFile(fileItem)"
-              :disabled="loadingFileId === fileItem.id"
-              title="Use in Slow Downer / Analyzer"
-            >
-              {{ loadingFileId === fileItem.id ? 'Loading...' : 'Use' }}
-            </button>
-            <button
-              class="btn-action btn-delete"
-              @click.stop="deleteFile(fileItem.id)"
-              title="Delete"
-            >
-              🗑️
-            </button>
-          </div>
+          <button
+            class="btn-action btn-delete"
+            @click.stop="deleteFile(fileItem.id)"
+            title="Delete"
+          >
+            🗑️
+          </button>
         </div>
         <div class="file-card-meta">
           <span>{{ formatSize(fileItem.size) }}</span>
@@ -74,17 +64,14 @@ import { ref, watch, nextTick } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useAudioFiles } from '../composables/useAudioFiles'
 
-const emit = defineEmits(['file-selected'])
-
 const { isAuthenticated } = useAuth()
-const { files, loading, uploadFile, updateFileName, deleteFile: deleteFileFromStore, getDownloadUrl } = useAudioFiles()
+const { files, loading, uploadFile, updateFileName, deleteFile: deleteFileFromStore } = useAudioFiles()
 
 const fileInputRef = ref(null)
 const nameInputRef = ref(null)
 const editingId = ref(null)
 const editName = ref('')
 const uploading = ref(false)
-const loadingFileId = ref(null)
 
 const formatSize = (bytes) => {
   if (!bytes) return '—'
@@ -160,25 +147,6 @@ const handleFileSelect = async (event) => {
     alert('Upload failed: ' + (e.message || 'Unknown error'))
   } finally {
     uploading.value = false
-  }
-}
-
-const useFile = async (fileItem) => {
-  const url = getDownloadUrl(fileItem)
-  if (!url) {
-    alert('Could not get file URL.')
-    return
-  }
-  loadingFileId.value = fileItem.id
-  try {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    const file = new File([blob], fileItem.name || 'audio', { type: blob.type || 'audio/mpeg' })
-    emit('file-selected', file)
-  } catch (e) {
-    alert('Failed to load file: ' + (e.message || 'Unknown error'))
-  } finally {
-    loadingFileId.value = null
   }
 }
 
@@ -325,38 +293,12 @@ watch(
   outline: none;
 }
 
-.file-card-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.btn-action {
+.btn-delete {
   padding: 6px 12px;
   border: none;
   border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-.btn-use {
-  background: #eef2ff;
-  color: #667eea;
-}
-
-.btn-use:hover:not(:disabled) {
-  background: #667eea;
-  color: white;
-}
-
-.btn-use:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-delete {
   background: transparent;
   font-size: 1rem;
   opacity: 0.6;

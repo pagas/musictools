@@ -122,7 +122,7 @@
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <div class="file-info-actions">
           <button
-            v-if="isAuthenticated"
+            v-if="isAuthenticated && !isFileInLibrary"
             class="btn-save-library"
             :disabled="savingToLibrary"
             @click="saveToLibrary"
@@ -161,7 +161,6 @@
 
       <MusicLibraryView
         v-if="activeTab === 'library' && isAuthenticated"
-        @file-selected="handleLibraryFileSelected"
       />
     </main>
   </div>
@@ -188,9 +187,10 @@ const router = useRouter()
 const route = useRoute()
 const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
 const { isAdmin, initializeUserRole } = useAdmin()
-const { uploadFile } = useAudioFiles()
+const { files: libraryFiles, uploadFile } = useAudioFiles()
 
 const currentFile = ref(null)
+const savingToLibrary = ref(false)
 const activeTab = ref('slowdowner')
 const showLoginView = ref(false)
 const userDropdownOpen = ref(false)
@@ -204,6 +204,15 @@ const handleClickOutside = (event) => {
 }
 
 const isAuthenticated = computed(() => checkAuth())
+
+// Check if current file is already in the library (by name and size)
+const isFileInLibrary = computed(() => {
+  if (!currentFile.value || !libraryFiles.value?.length) return false
+  const file = currentFile.value
+  return libraryFiles.value.some(
+    (libFile) => libFile.name === file.name && libFile.size === file.size
+  )
+})
 
 // Map route names to tab names
 const routeToTab = {
@@ -295,11 +304,6 @@ onBeforeUnmount(() => {
 
 const handleFileSelected = (file) => {
   currentFile.value = file
-}
-
-const handleLibraryFileSelected = (file) => {
-  currentFile.value = file
-  setActiveTab('slowdowner')
 }
 
 const changeFile = () => {
