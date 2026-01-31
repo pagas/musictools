@@ -114,12 +114,23 @@
     <main>
       <FileUpload
         v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account' && activeTab !== 'library'"
+        :is-authenticated="isAuthenticated"
         @file-selected="handleFileSelected"
       />
       
       <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account' && activeTab !== 'library'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
-        <button class="btn-change" @click="changeFile">Change File</button>
+        <div class="file-info-actions">
+          <button
+            v-if="isAuthenticated"
+            class="btn-save-library"
+            :disabled="savingToLibrary"
+            @click="saveToLibrary"
+          >
+            {{ savingToLibrary ? 'Saving...' : 'Save to Music Library' }}
+          </button>
+          <button class="btn-change" @click="changeFile">Change File</button>
+        </div>
       </div>
 
       <MusicPlayer
@@ -161,6 +172,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
 import { useAdmin } from './composables/useAdmin'
+import { useAudioFiles } from './composables/useAudioFiles'
 import FileUpload from './components/FileUpload.vue'
 import MusicPlayer from './components/MusicPlayer.vue'
 import MusicAnalyzer from './components/MusicAnalyzer.vue'
@@ -176,6 +188,7 @@ const router = useRouter()
 const route = useRoute()
 const { user, loading, logout, isAuthenticated: checkAuth } = useAuth()
 const { isAdmin, initializeUserRole } = useAdmin()
+const { uploadFile } = useAudioFiles()
 
 const currentFile = ref(null)
 const activeTab = ref('slowdowner')
@@ -291,6 +304,20 @@ const handleLibraryFileSelected = (file) => {
 
 const changeFile = () => {
   currentFile.value = null
+}
+
+const saveToLibrary = async () => {
+  const file = currentFile.value
+  if (!file || !isAuthenticated.value) return
+  savingToLibrary.value = true
+  try {
+    await uploadFile(file)
+    alert('File saved to Music Library!')
+  } catch (e) {
+    alert('Failed to save: ' + (e.message || 'Unknown error'))
+  } finally {
+    savingToLibrary.value = false
+  }
 }
 
 const handleLogout = async () => {
@@ -510,6 +537,38 @@ main {
 .file-info span {
   color: #667eea;
   font-weight: 600;
+}
+
+.file-info-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-save-library {
+  background: #eef2ff;
+  color: #667eea;
+  border: 2px solid #667eea;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95em;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-save-library:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-save-library:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-change {

@@ -25,15 +25,91 @@
         <p class="upload-hint">Supported formats: MP3, WAV, OGG, M4A</p>
       </div>
     </div>
+
+    <div v-if="props.isAuthenticated" class="library-option">
+      <button
+        type="button"
+        class="btn-library-toggle"
+        @click="showLibraryPicker = !showLibraryPicker"
+      >
+        {{ showLibraryPicker ? '▼' : '▶' }} Use from Music Library
+      </button>
+      <div v-if="showLibraryPicker" class="library-picker">
+        <div v-if="libraryLoading" class="library-loading">Loading...</div>
+        <div v-else-if="libraryFiles.length === 0" class="library-empty">
+          No files in your library yet. <a href="#" @click.prevent="goToLibrary">Go to Music Library</a> to upload.
+        </div>
+        <div v-else class="library-list">
+          <button
+            v-for="item in libraryFiles"
+            :key="item.id"
+            type="button"
+            class="library-item-btn"
+            :disabled="loadingFileId === item.id"
+            @click="useFromLibrary(item)"
+          >
+            <span class="library-item-name">{{ item.name }}</span>
+            <span class="library-item-meta">{{ formatSize(item.size) }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAudioFiles } from '../composables/useAudioFiles'
+
+const props = defineProps({
+  isAuthenticated: { type: Boolean, default: false }
+})
 
 const emit = defineEmits(['file-selected'])
+
+const router = useRouter()
+const { files: libraryFiles, loading: libraryLoading, getDownloadUrl } = useAudioFiles()
+
 const fileInput = ref(null)
 const isDragging = ref(false)
+const showLibraryPicker = ref(false)
+const loadingFileId = ref(null)
+
+const formatSize = (bytes) => {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const goToLibrary = () => {
+  router.push('/library')
+}
+
+const useFromLibrary = async (item) => {
+  const url = getDownloadUrl(item)
+  if (!url) {
+    alert('Could not get file URL.')
+    return
+  }
+  loadingFileId.value = item.id
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const file = new File([blob], item.name || 'audio', { type: blob.type || 'audio/mpeg' })
+    emit('file-selected', file)
+    showLibraryPicker.value = false
+  } catch (e) {
+    alert('Failed to load file: ' + (e.message || 'Unknown error'))
+  } finally {
+    loadingFileId.value = null
+  }
+}
+
+watch(() => props.isAuthenticated, (auth) => {
+  if (!auth) showLibraryPicker.value = false
+})
 
 const triggerFileInput = () => {
   fileInput.value?.click()
@@ -46,6 +122,7 @@ const handleFileSelect = (event) => {
   } else {
     alert('Please select a valid audio file.')
   }
+  event.target.value = ''
 }
 
 const handleDrop = (event) => {
@@ -103,5 +180,101 @@ const handleDrop = (event) => {
 .upload-hint {
   color: #666;
   font-size: 0.9em;
+}
+
+.library-option {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-library-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.btn-library-toggle:hover {
+  color: #764ba2;
+}
+
+.library-picker {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f8f9ff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.library-loading,
+.library-empty {
+  color: #718096;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.library-empty a {
+  color: #667eea;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.library-empty a:hover {
+  text-decoration: underline;
+}
+
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.library-item-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.library-item-btn:hover:not(:disabled) {
+  border-color: #667eea;
+  background: #f0f2ff;
+}
+
+.library-item-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.library-item-name {
+  font-weight: 500;
+  color: #2d3748;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-item-meta {
+  font-size: 0.8rem;
+  color: #718096;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 </style>

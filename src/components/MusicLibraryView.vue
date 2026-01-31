@@ -25,9 +25,6 @@
     </div>
     <div v-else-if="files.length === 0" class="empty-state">
       <p>No audio files yet. Upload your first file to get started!</p>
-      <button class="btn-upload-empty" @click="fileInputRef?.click()" :disabled="uploading">
-        {{ uploading ? 'Uploading...' : 'Upload File' }}
-      </button>
     </div>
     <div v-else class="files-grid">
       <div v-for="fileItem in files" :key="fileItem.id" class="file-card">
@@ -395,29 +392,6 @@ watch(
 }
 
 .empty-state p {
-  margin-bottom: 20px;
-}
-
-.btn-upload-empty {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-upload-empty:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-}
-
-.btn-upload-empty:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  margin: 0;
 }
 </style>
