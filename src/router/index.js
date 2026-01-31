@@ -45,6 +45,12 @@ const routes = [
     name: 'account',
     component: { template: '<div></div>' },
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/library',
+    name: 'library',
+    component: { template: '<div></div>' },
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -53,8 +59,24 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard for admin routes
+// Navigation guard for auth-protected and admin routes
 router.beforeEach(async (to, from, next) => {
+  // Redirect unauthenticated users from protected routes
+  if (to.meta?.requiresAuth && !to.meta?.requiresAdmin) {
+    try {
+      const { useAuth } = await import('../composables/useAuth')
+      const { isAuthenticated } = useAuth()
+      if (!isAuthenticated()) {
+        next('/slowdowner')
+        return
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error)
+      next('/slowdowner')
+      return
+    }
+  }
+
   if (to.meta?.requiresAdmin) {
     try {
       // Import useAdmin dynamically to avoid circular dependencies

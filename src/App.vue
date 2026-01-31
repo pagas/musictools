@@ -42,6 +42,12 @@
               <div v-if="userDropdownOpen" class="user-dropdown-menu">
                 <button
                   class="dropdown-item"
+                  @click="setActiveTab('library'); userDropdownOpen = false"
+                >
+                  🎵 Music Library
+                </button>
+                <button
+                  class="dropdown-item"
                   @click="setActiveTab('account'); userDropdownOpen = false"
                 >
                   ⚙️ Account
@@ -107,11 +113,11 @@
 
     <main>
       <FileUpload
-        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account'"
+        v-if="!currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account' && activeTab !== 'library'"
         @file-selected="handleFileSelected"
       />
       
-      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account'" class="file-info">
+      <div v-if="currentFile && activeTab !== 'multitrack' && activeTab !== 'performance' && activeTab !== 'admin' && activeTab !== 'account' && activeTab !== 'library'" class="file-info">
         <p><strong>Current file:</strong> <span>{{ currentFile.name }}</span></p>
         <button class="btn-change" @click="changeFile">Change File</button>
       </div>
@@ -141,6 +147,11 @@
       <AccountView
         v-if="activeTab === 'account' && isAuthenticated"
       />
+
+      <MusicLibraryView
+        v-if="activeTab === 'library' && isAuthenticated"
+        @file-selected="handleLibraryFileSelected"
+      />
     </main>
   </div>
 </template>
@@ -157,6 +168,7 @@ import MultiTrackEditor from './components/MultiTrackEditor.vue'
 import SongPerformanceView from './components/SongPerformanceView.vue'
 import AdminView from './components/AdminView.vue'
 import AccountView from './components/AccountView.vue'
+import MusicLibraryView from './components/MusicLibraryView.vue'
 import LoginView from './components/LoginView.vue'
 import PublicPreviewPage from './components/PublicPreviewPage.vue'
 
@@ -187,7 +199,8 @@ const routeToTab = {
   'performance': 'performance',
   'multitrack': 'multitrack',
   'admin': 'admin',
-  'account': 'account'
+  'account': 'account',
+  'library': 'library'
 }
 
 // Sync activeTab with route
@@ -211,6 +224,8 @@ const setActiveTab = (tab) => {
     router.push('/admin')
   } else if (tab === 'account') {
     router.push('/account')
+  } else if (tab === 'library') {
+    router.push('/library')
   }
 }
 
@@ -267,6 +282,11 @@ onBeforeUnmount(() => {
 
 const handleFileSelected = (file) => {
   currentFile.value = file
+}
+
+const handleLibraryFileSelected = (file) => {
+  currentFile.value = file
+  setActiveTab('slowdowner')
 }
 
 const changeFile = () => {
